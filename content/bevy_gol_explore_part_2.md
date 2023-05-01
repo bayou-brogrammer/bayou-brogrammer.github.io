@@ -82,7 +82,7 @@ this is the docstring attached to the `RenderGraph` resource:
 > The `RenderGraph` configures the modular, parallel and re-usable render logic. It is a retained and stateless (nodes themselves may have their own
 > internal state) structure, which can not be modified while it is executed by the graph runner.
 > The `RenderGraphRunner` is responsible for executing the entire graph each frame. It consists of three main components: Nodes, Edges and Slots.
-> `Nodes` are responsible for generating draw calls and operating on input and output slots. `Edges` specify the order of execution for nodes and connect input and output slots together. 
+> `Nodes` are responsible for generating draw calls and operating on input and output slots. `Edges` specify the order of execution for nodes and connect input and output slots together.
 > `Slots` describe the render resources created or used by the nodes.
 > Additionally a render graph can contain multiple sub graphs, which are run by the corresponding nodes. Every render graph can have its own optional input node.
 
@@ -160,7 +160,7 @@ pub trait Node: Downcast + Send + Sync + 'static {
 }
 ```
 
-The `input` defines required input slots and `output` defines produced output slots. This will exist on the `RenderGraphContext`. Our example doesn't 
+The `input` defines required input slots and `output` defines produced output slots. This will exist on the `RenderGraphContext`. Our example doesn't
 use either, so we don't care for the graph context.
 
 ```rust
@@ -285,7 +285,7 @@ To start with our `init` function in our shader, we see some function inputs:
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) 
 ```
 
-This is a builtin value for the current invocation’s global invocation ID, i.e. its position in the compute shader grid. WGSL has many builtin values 
+This is a builtin value for the current invocation’s global invocation ID, i.e. its position in the compute shader grid. WGSL has many builtin values
 and functions. Please refer to the spec for more info [WebGPU Shading Language](https://www.w3.org/TR/WGSL/).
 
 And the `num_workgroups` is the number of workgroups in each dimension.
@@ -296,7 +296,7 @@ fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_wo
 }
 ```
 
-We can get the current location within the shader by casting the invocation.xy to an i32. 
+We can get the current location within the shader by casting the invocation.xy to an i32.
 
 > invocation.xy is short hand for invocation.x and invocation.y
 
