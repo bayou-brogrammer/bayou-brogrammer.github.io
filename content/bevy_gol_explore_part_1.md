@@ -1,6 +1,6 @@
 +++
 title = "Exploring Bevy Game of life shader (Part 1)"
-date = 2023-05-01
+date = 2023-05-01T12:00:00Z
 
 [taxonomies]
 tags = ["blog", "programming", "bevy", "rust", "shader"]
@@ -26,6 +26,8 @@ are some helpful resources:
 So lets get started!
 
 ## Setup
+
+This tutorial currently follows along using Bevy 0.10.
 
 I am using the [bevy_game_template](https://github.com/NiklasEi/bevy_game_template) as my starter, just with all the extra code ripped out, except for main and lib.
 
@@ -64,7 +66,7 @@ fn main() {
 ...
 
 const SIM_SIZE: (u32, u32) = (1280, 720);
-const WORKGROUP_SIZE: u32 = 32;
+const WORKGROUP_SIZE: u32 = 8;
 
 pub struct ShaderPlaygroundPlugin;
 impl Plugin for ShaderPlaygroundPlugin {
@@ -228,6 +230,11 @@ binding(0) we expect there to be a binding of type `StorageTexture`, that is rea
 
 We then pull the pipeline cache to create our pipelines and pull our shader from the asset's folder.
 
+## Compute Shaders
+
+> A compute shader is simply a shader that allows you to leverage the GPU's parallel computing power for arbitrary tasks. You can use them for anything from creating a texture to running a neural network. I'll get more into how they work in a bit, but for now suffice to say that we're going to use them to create the vertex and index buffers for our terrain.
+> As of writing, compute shaders are still experimental on the web. You can enable them on beta versions of browsers such as Chrome Canary and Firefox Nightly. Because of this I'll cover a method to use a fragment shader to compute the vertex and index buffers after we cover the compute shader method.
+
 ```rust
     let init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         layout: vec![texture_bind_group_layout.clone()],
@@ -262,16 +269,16 @@ Lets quickly setup our shader and then we can move onto the actual compute shade
 // assets/game_of_life.wgsl
 
 @group(0) @binding(0)
-var texture: texture_storage_2d<rgba16float, read_write>;
+var texture: texture_storage_2d<rgba8unorm, read_write>;
 
-@compute @workgroup_size(32, 32, 1)
+@compute @workgroup_size(8, 8, 1)
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {}
 
-@compute @workgroup_size(32, 32, 1)
+@compute @workgroup_size(8, 8, 1)
 fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {}
 ```
 
-We can see that from what we defined in our `BindGroupLayoutDescriptor` that we define a `texture_storage_2d<rgba16float, read_write>` at `binding(0)`. Looking
+We can see that from what we defined in our `BindGroupLayoutDescriptor` that we define a `texture_storage_2d<rgba8unorm, read_write>` at `binding(0)`. Looking
 back at our descriptor:
 
 ```rust
@@ -293,7 +300,7 @@ BindGroupLayoutDescriptor {
 We see that our `BindGroupLayoutEntry` matches what we expect at `group(0) binding(0)`. This has to match 1:1, otherwise wgpu will panic on run.
 
 Afterwards, we simply just adds our entry points that we defined in the pipeline's. The `@workgroup_size` is the size of the workgroup that will be
-executed on the gpu. Bevy example uses 8, but lets push the bounds a bit and make it 32.
+executed on the gpu. Bevy example uses 8.
 Let's add our newly created pipeline resource to the render world. Back in the plugin:
 
 ```rust

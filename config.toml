@@ -19,7 +19,7 @@ highlight_theme = "boron"
 [extra]
 # One of: blue, green, orange, pink, red.
 # Defaults to blue.
-accent_color = "orange"
+accent_color = "red"
 
 # One of: blue, dark, green, orange, pink, red.
 # Enabling dark background will also modify primary font color
