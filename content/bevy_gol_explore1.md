@@ -1,0 +1,264 @@
++++
+title = "Exploring Bevy Game of life Shader (Part 1))"
+date = 2023-05-01
+
+[taxonomies]
+tags = ["blog", "programming", "bevy", "rust", "shader"]
++++
+
+Recently, I have found myself facinated by graphical programming. On the side, I started following a tutorial by [hakolao](https://github.com/hakolaordesxz),
+which explores compute shaders with [bevy](https://github.com/bevyengine/bevy) using [vulkano](https://github.com/vulkano-rs/vulkano). If you are interested,
+this is the tutorial [compute_shader_tutorial](https://github.com/hakolao/compute_shader_tutorial).
+
+As a fun exercise, I decided to explore using compute shaders using wgpu within bevy. This is part 1 of exploring bevy game of life shader example, and 
+some ways to enhance the experience.
+
+<!-- more -->
+
+I assume you have general knowledge of rust, bevy, and wgpu, but I will still explain somethings along the way. So lets get started!
+
+## Setup
+
+I am using the [bevy_game_template](https://github.com/NiklasEi/bevy_game_template) as my starter, just with all the extra code ripped out, except for main and lib.
+
+```rust
+// main.rs
+
+// <imports>
+...
+
+fn main() {
+    App::new()
+        .insert_resource(ClearColor(Color::BLACK))
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                canvas: Some("#shader_playground".to_owned()),
+                title: "Shader Playground".to_string(),
+                present_mode: bevy::window::PresentMode::AutoNoVsync, // unthrottled FPS
+                ..default()
+            }),
+            ..default()
+        }))
+        .add_plugin(ShaderPlaygroundPlugin)
+        .add_system(set_window_icon.on_startup())
+        .run();
+}
+
+// <window_icon sys>
+...
+
+```
+
+```rust
+// lib.rs
+
+// <imports>
+...
+
+const SIM_SIZE: (u32, u32) = (1280, 720);
+const WORKGROUP_SIZE: u32 = 32;
+
+pub struct ShaderPlaygroundPlugin;
+impl Plugin for ShaderPlaygroundPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugin(FrameTimeDiagnosticsPlugin::default())
+            .add_system(window_fps);
+    }
+}
+
+fn window_fps(diagnostics: Res<Diagnostics>, mut windows: Query<&mut Window, With<PrimaryWindow>>) {
+    if let Ok(mut window) = windows.get_single_mut() {
+        if let Some(fps_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+            if let Some(fps_smoothed) = fps_diagnostic.smoothed() {
+                window.title = format!("{fps_smoothed:.2}");
+            }
+        }
+    }
+}
+
+```
+
+Pretty simple setup. Just added a simple fps system to print the FPS at the top of the window. We need to setup our canvas for our simulation.
+We will just use a simple image constrained to our `SIM_SIZE` variable. You can organize your code how you feel, but I will be breaking out the code
+from the original example into seperate files for readability.
+
+```rust
+// image.rs
+
+#[derive(Resource, Clone, Deref, ExtractResource)]
+pub struct GameOfLifeImage(pub Handle<Image>);
+
+pub fn create_image(width: u32, height: u32) -> Image {
+    let mut image = Image::new_fill(
+        Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+    );
+
+    image.texture_descriptor.usage =
+        TextureUsages::COPY_DST | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING;
+
+    image
+}
+
+```
+
+This is just a simple helper function to create an image. We will be using this to create our simulation image. `GameOfLifeImage` will hold a reference to our
+handle image so that it doesn't get unloaded. You will see it is annotated with `ExtractResource` derive. This is required to extract the image from the main bevy
+world into the render world. You can also manually derive this, if needed. Lets use it within our setup function. Back in
+`lib.rs`:
+
+```rust
+...
+fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let image = image::create_image(SIM_SIZE.0, SIM_SIZE.1);
+    let image = images.add(image);
+
+    commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(SIM_SIZE.0 as f32, SIM_SIZE.1 as f32)),
+            ..default()
+        },
+        texture: image.clone(),
+        ..default()
+    });
+
+    commands.spawn(Camera2dBundle::default());
+    commands.insert_resource(image::GameOfLifeImage(image));
+}
+```
+
+Quick and easy. Just create our image, create a sprite based off the image, spawn a 2D camera, and then inject our resource into bevy world. 
+Now we just need to hookup our system back in the plugin.
+
+```rust
+fn build(&self, app: &mut App) {
+    app.add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_startup_system(setup)
+        .add_system(window_fps);
+}
+```
+
+Running the simulation should produce a black screen and nothing more. But hey! No errors! Lets move on.
+
+As mentioned earlier, bevy has a render world which is extracted each render instance. We need to tell our render setup how to access members from the main world.
+In our plugin, add the `ExtractResourcePlugin` for our `GameOfLifeImage` resource.
+
+```rust
+...
+// Extract the game of life image resource from the main world into the render world
+// for operation on by the compute shader and display on the sprite.
+app.add_plugin(ExtractResourcePlugin::<GameOfLifeImage>::default());
+...
+```
+
+Now onto the actual meat of why I am writing this. Lets get into wgpu. We will be using a compute shader, so our pipeline will need to be a `ComputePipeline`.
+
+> A pipeline describes all the actions the gpu will perform when acting on a set of data
+
+Lets create a new file, `pipeline.rs` and add the following:
+
+```rust
+use bevy::{prelude::*, render::render_resource::*};
+
+#[derive(Resource)]
+pub struct GameOfLifePipeline {
+    init_pipeline: CachedComputePipelineId,
+    update_pipeline: CachedComputePipelineId,
+    texture_bind_group_layout: BindGroupLayout,
+}
+
+impl FromWorld for GameOfLifePipeline {
+    fn from_world(world: &mut World) -> Self {}
+}
+
+```
+
+Our pipeline resource holds the two compute pipeline id's we will be using (init for setup) and (update for each frame). We also need to hold onto 
+the bind group layout.
+
+> a bind group layout is a way to describe the structure of resources that a shader will access during execution. The resources include buffers, textures, and samplers
+
+Lets expand upon our `FromWorld` implementation.
+
+```rust
+impl FromWorld for GameOfLifePipeline {
+    fn from_world(world: &mut World) -> Self {
+        let texture_bind_group_layout =
+            world
+                .resource::<RenderDevice>()
+                .create_bind_group_layout(&BindGroupLayoutDescriptor {
+                    label: Some("Game of Life Bind Group Layout"),
+                    entries: &[BindGroupLayoutEntry {
+                        binding: 0,
+                        count: None,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::StorageTexture {
+                            access: StorageTextureAccess::ReadWrite,
+                            format: TextureFormat::Rgba8Unorm,
+                            view_dimension: Textu
+
+        ...
+```
+
+WHOA! What is this weird layout stuff? First thing first, the `RenderDevice` is equivalent to `wgpu::Device`. We are just using the bevy wrapper.
+I like to add labels to all my shader creations, just to make it easier to track bugs when they do arise. This layout is telling the pipeline that at
+binding(0) we expect there to be a binding of type `StorageTexture`, that is read_write, and has the format of `Rgba8Unorm`.
+
+We then pull the pipeline cache to create our pipelines and pull our shader from the asset's folder.
+
+```rust
+    let init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+        layout: vec![texture_bind_group_layout.clone()],
+        shader_defs: vec![],
+        shader: shader.clone(),
+        entry_point: Cow::from("init"),
+        push_constant_ranges: Vec::new(),
+        label: Some(std::borrow::Cow::Borrowed("Game of Life Init Pipeline")),
+    });
+    let update_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+        shader,
+        shader_defs: vec![],
+        entry_point: Cow::from("update"),
+        push_constant_ranges: Vec::new(),
+        layout: vec![texture_bind_group_layout.clone()],
+        label: Some(std::borrow::Cow::Borrowed("Game of Life Update Pipeline")),
+    });
+
+    GameOfLifePipeline {
+        texture_bind_group_layout,
+        init_pipeline,
+        update_pipeline,
+    }
+```
+
+The init and update pipeline use the same layout and shader. We are not using push constants yet, so we can leave that as an empty vector, same with shader_defs.
+The important part is the entry_point. This is the name of the function in the shader that will be executed.
+
+Lets quickly setup our shader and then we can move onto the actual compute shader.
+
+```wgsl
+// assets/game_of_life.wgsl 
+
+@compute @workgroup_size(32, 32, 1)
+fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {}
+
+@compute @workgroup_size(32, 32, 1)
+fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {}
+```
+
+This simply just adds our entry points that we defined in the pipeline's. The `@workgroup_size` is the size of the workgroup that will be executed on the gpu.
+Bevy example uses 8, but lets push the bounds a bit and make it 32. Let's add our newly created pipeline resource to the render world. Back in the plugin:
+
+```rust
+...
+let render_app = app.sub_app_mut(RenderApp);
+render_app.init_resource::<GameOfLifePipeline>();
+```
+
+Running the example now should produce the same screen, but still no errors. We are getting closer to actually doing something. More in part 2.
