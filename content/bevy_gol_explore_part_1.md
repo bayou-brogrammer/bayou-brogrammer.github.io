@@ -1,5 +1,5 @@
 +++
-title = "Exploring Bevy Game of life Shader (Part 1))"
+title = "Exploring Bevy Game of life shader (Part 1)"
 date = 2023-05-01
 
 [taxonomies]
@@ -10,12 +10,20 @@ Recently, I have found myself facinated by graphical programming. On the side, I
 which explores compute shaders with [bevy](https://github.com/bevyengine/bevy) using [vulkano](https://github.com/vulkano-rs/vulkano). If you are interested,
 this is the tutorial [compute_shader_tutorial](https://github.com/hakolao/compute_shader_tutorial).
 
-As a fun exercise, I decided to explore using compute shaders using wgpu within bevy. This is part 1 of exploring bevy game of life shader example, and 
+As a fun exercise, I decided to explore using compute shaders using wgpu within bevy. This is part 1 of exploring bevy game of life shader example, and
 some ways to enhance the experience.
 
 <!-- more -->
 
-I assume you have general knowledge of rust, bevy, and wgpu, but I will still explain somethings along the way. So lets get started!
+I assume you have general knowledge of rust, bevy, and wgpu, but I will still explain somethings along the way. If you need a refresher on anything, here
+are some helpful resources:
+
+[Learn Rust](https://doc.rust-lang.org/book/)
+[Bevy Book](https://bevyengine.org/learn/book/introduction/)
+[Bevy Cheatbook](https://bevy-cheatbook.github.io/)
+[Learn Wgpu](https://sotrh.github.io/learn-wgpu/)
+
+So lets get started!
 
 ## Setup
 
@@ -133,7 +141,7 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 }
 ```
 
-Quick and easy. Just create our image, create a sprite based off the image, spawn a 2D camera, and then inject our resource into bevy world. 
+Quick and easy. Just create our image, create a sprite based off the image, spawn a 2D camera, and then inject our resource into bevy world.
 Now we just need to hookup our system back in the plugin.
 
 ```rust
@@ -179,7 +187,7 @@ impl FromWorld for GameOfLifePipeline {
 
 ```
 
-Our pipeline resource holds the two compute pipeline id's we will be using (init for setup) and (update for each frame). We also need to hold onto 
+Our pipeline resource holds the two compute pipeline id's we will be using (init for setup) and (update for each frame). We also need to hold onto
 the bind group layout.
 
 > a bind group layout is a way to describe the structure of resources that a shader will access during execution. The resources include buffers, textures, and samplers
@@ -196,12 +204,20 @@ impl FromWorld for GameOfLifePipeline {
                     label: Some("Game of Life Bind Group Layout"),
                     entries: &[BindGroupLayoutEntry {
                         binding: 0,
-                        count: None,
                         visibility: ShaderStages::COMPUTE,
                         ty: BindingType::StorageTexture {
                             access: StorageTextureAccess::ReadWrite,
                             format: TextureFormat::Rgba8Unorm,
-                            view_dimension: Textu
+                            view_dimension: TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }],
+                });
+
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let shader = world
+            .resource::<AssetServer>()
+            .load("shaders/game_of_life.wgsl");
 
         ...
 ```
@@ -243,7 +259,10 @@ The important part is the entry_point. This is the name of the function in the s
 Lets quickly setup our shader and then we can move onto the actual compute shader.
 
 ```wgsl
-// assets/game_of_life.wgsl 
+// assets/game_of_life.wgsl
+
+@group(0) @binding(0)
+var texture: texture_storage_2d<rgba16float, read_write>;
 
 @compute @workgroup_size(32, 32, 1)
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {}
@@ -252,8 +271,30 @@ fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_wo
 fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {}
 ```
 
-This simply just adds our entry points that we defined in the pipeline's. The `@workgroup_size` is the size of the workgroup that will be executed on the gpu.
-Bevy example uses 8, but lets push the bounds a bit and make it 32. Let's add our newly created pipeline resource to the render world. Back in the plugin:
+We can see that from what we defined in our `BindGroupLayoutDescriptor` that we define a `texture_storage_2d<rgba16float, read_write>` at `binding(0)`. Looking
+back at our descriptor:
+
+```rust
+BindGroupLayoutDescriptor {
+    label: Some("Game of Life Bind Group Layout"),
+    entries: &[BindGroupLayoutEntry {
+        binding: 0,
+        visibility: ShaderStages::COMPUTE,
+        ty: BindingType::StorageTexture {
+            access: StorageTextureAccess::ReadWrite,
+            format: TextureFormat::Rgba8Unorm,
+            view_dimension: TextureViewDimension::D2,
+        },
+        count: None,
+    }],
+}
+```
+
+We see that our `BindGroupLayoutEntry` matches what we expect at `group(0) binding(0)`. This has to match 1:1, otherwise wgpu will panic on run.
+
+Afterwards, we simply just adds our entry points that we defined in the pipeline's. The `@workgroup_size` is the size of the workgroup that will be
+executed on the gpu. Bevy example uses 8, but lets push the bounds a bit and make it 32.
+Let's add our newly created pipeline resource to the render world. Back in the plugin:
 
 ```rust
 ...
@@ -262,3 +303,5 @@ render_app.init_resource::<GameOfLifePipeline>();
 ```
 
 Running the example now should produce the same screen, but still no errors. We are getting closer to actually doing something. More in part 2.
+
+Code can be found on github: [Part 1](https://github.com/lecoqjacob/bevy_shader_playground/blob/5b841c3ac3f2c08e24ed8b2d47e9996eee0bfda1/sims/game_of_life_sim/src/main.rs)
