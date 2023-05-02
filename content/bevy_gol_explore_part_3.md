@@ -9,6 +9,8 @@ tags = ["blog", "programming", "bevy", "rust", "shader"]
 It is excited to finally see some progress after so much boilerplate! Let's change up the color scheme a bit! I like the color red, so let's make the
 alive cells red. In our shader, switch the init_pipeline color to the following:
 
+<!-- more -->
+
 ```glsl
 @compute @workgroup_size(8, 8, 1)
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {
