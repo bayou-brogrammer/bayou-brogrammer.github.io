@@ -6,7 +6,7 @@ date = 2023-05-01T20:00:00Z
 tags = ["blog", "programming", "bevy", "rust", "shader"]
 +++
 
-It is excited to finally see some progress after so much boilerplate! Let's change up the color scheme a bit! I like the color red, so let's make the
+It is exciting to finally see some progress after so much boilerplate! Let's change up the color scheme a bit! I like the color red, so let's make the
 alive cells red. In our shader, switch the init_pipeline color to the following:
 
 <!-- more -->
