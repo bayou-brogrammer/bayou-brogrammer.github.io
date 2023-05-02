@@ -348,6 +348,6 @@ the alive value from a `bool` to a `f32`. So if alive the color will be `vec4<f3
 
 And now the moment of truth, we can run our code and see the results! Running should produce something like this:
 
-{{ image(src="/images/gol_part2.png", position="left") }}
+{{ image(src="/images/gol_part2.png", position="center") }}
 
 Code can be found on github: [Part 2](https://github.com/lecoqjacob/bevy_shader_playground/blob/4f91ce7dd48d83adb6f9823b01c16941e6b3db67/sims/game_of_life_sim/src/lib.rs)
