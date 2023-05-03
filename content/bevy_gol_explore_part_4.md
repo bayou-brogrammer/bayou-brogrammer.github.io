@@ -432,22 +432,23 @@ impl render_graph::Node for AutomataDrawNode {
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
         let input_state = &world.resource::<InputState>();
-        let texture_bind_group = &world.resource::<AutomataTextureBindGroup>().0;
-        let draw_bind_group = &world.resource::<AutomataDrawBindGroup>().0;
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let pipeline = world.resource::<AutomataDrawPipeline>();
 
-        let mut pass = render_context
-            .command_encoder()
-            .begin_compute_pass(&ComputePassDescriptor::default());
+        if input_state.is_drawing() {
+            let texture_bind_group = &world.resource::<AutomataTextureBindGroup>().0;
+            let draw_bind_group = &world.resource::<AutomataDrawBindGroup>().0;
+            let pipeline_cache = world.resource::<PipelineCache>();
+            let pipeline = world.resource::<AutomataDrawPipeline>();
 
-        pass.set_bind_group(0, texture_bind_group, &[]);
+            let mut pass = render_context
+                .command_encoder()
+                .begin_compute_pass(&ComputePassDescriptor::default());
 
-        // select the pipeline based on the current state
-        match self.state {
-            AutomataDrawState::Loading => {}
-            AutomataDrawState::Update => {
-                if input_state.is_drawing() {
+            pass.set_bind_group(0, texture_bind_group, &[]);
+
+            // select the pipeline based on the current state
+            match self.state {
+                AutomataDrawState::Loading => {}
+                AutomataDrawState::Update => {
                     let draw_pipeline = pipeline_cache
                         .get_compute_pipeline(pipeline.draw_pipeline)
                         .unwrap();
@@ -642,4 +643,4 @@ With that, our cells will now wrap around the edges of the simulation! Awesome!
 > Challenge: Create a method to draw a square instead of a circle. For even more complexity, you can add a push_constant bool to pass in
 > whether you want to draw a circle or a square.
 
-Code can be found on github: [Part 4](https://github.com/lecoqjacob/bevy_shader_playground/tree/d77b3b4a8015860b03589b1c3a40bd08c07bb1a9)
+Code can be found on github: [Part 4](https://github.com/lecoqjacob/bevy_shader_playground/tree/237f23dffe3b52ba363442e6f68e8925441bd0d3)
