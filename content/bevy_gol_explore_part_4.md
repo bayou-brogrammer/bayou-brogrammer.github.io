@@ -156,11 +156,12 @@ app
 A simple camera controller. We generate a move delta based on the pressed keys and then using bevy's builtin time resource, manipulate the
 camera's position for buttery smooth movement. Adjust the movement constant to your liking. The zoom just listens for scroll events and adjusts
 the orthographic projection's scale. The `MouseScrollUnit::Pixel` case is taken from an online example I found. I don't know what triggers a
-`MouseScrollUnit::Pixel`, but I have only seen `Line` units so far, but better safe than sorry! You should now be able to pan around
-the simulation and also zoom
+`MouseScrollUnit::Pixel`, but I have only seen `Line` units so far, but better safe than sorry!
+
+To better see that our camera works well, you can replace the `ClearColor(Color::BLACK)` with `ClearColor(Color::WHITE)`.
+You should now be able to pan aroundthe simulation and also zoom!You should now be able to pan around
 
 {{ image(src="/images/gol_camera.gif", position="center") }}
-
 
 The main thing I want this part to focus on would be drawing onto our canvas. We will be using *ANOTHER* ;) compute pipeline to handle this for us.
 Lets setup the mouse positioning system that will be used.
@@ -545,7 +546,7 @@ fn draw(@builtin(global_invocation_id) invocation_id: vec3<u32>)
 This is all familiar except for the new push_contant and a new function: `textureDimensions`. The `push_contant` variable should match what we are passing from
 rust side of things. We are passing in the start and end of the mouse position as well as the radius of the circle we want to draw.
 
-`textureDimensions` function returns the dimensions of the texture we are sampling from.We use this to check if the current pixel is outside of the texture 
+`textureDimensions` function returns the dimensions of the texture we are sampling from.We use this to check if the current pixel is outside of the texture
 bounds.
 
 Now we pass in a `start` and `end` position, so we need to generate a line between these two points. Searching the web I found the following stackoverflow
