@@ -6,7 +6,7 @@ date = 2023-05-01T12:00:00Z
 tags = ["blog", "programming", "bevy", "rust", "shader"]
 +++
 
-Recently, I have found myself facinated by graphical programming. On the side, I started following a tutorial by [hakolao](https://github.com/hakolaordesxz),
+Recently, I have found myself facinated by graphical programming. On the side, I started following a tutorial by [hakolao](https://github.com/hakolao),
 which explores compute shaders with [bevy](https://github.com/bevyengine/bevy) using [vulkano](https://github.com/vulkano-rs/vulkano). If you are interested,
 this is the tutorial [compute_shader_tutorial](https://github.com/hakolao/compute_shader_tutorial).
 
