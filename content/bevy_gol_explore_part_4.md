@@ -8,10 +8,10 @@ tags = ["blog", "programming", "bevy", "rust", "shader"]
 
 I promised some additions to the original example provided so lets start with the easiest one, a simple camera controller.
 I just want to be able to pan around the simulation and zoom in a bit. I am going to run a cleanup and refactor for readability and
-cleanliness. 
+cleanliness.
 
 - Create three new files, `camera.rs`, `input.rs`, and `utils.rs`, along with the a foldr `pipeline`. It is important the pipeline folder is named exactly
-as the `pipeline.rs` file as I am not using `mod.rs` files. 
+as the `pipeline.rs` file as I am not using `mod.rs` files.
 - Move the function `create_image` into our utils folder and delete the image file.
 - Inside `pipeline` folder create a `automata.rs` file and move all the pipeline code from our past
 three posts into it. This includes the `Pipeline`, `TextureBindGroup`, `State`, and `Node`.
