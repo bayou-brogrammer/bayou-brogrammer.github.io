@@ -1,5 +1,5 @@
 # The URL the site will be built for
-base_url = "https://lecoqjacob.github.io"
+base_url = "https://n16hth4wkk.github.io"
 theme    = "terminimal"
 
 # Whether to automatically compile all Sass files in the sass directory
@@ -39,11 +39,11 @@ logo_text = "Yendor's World"
 author = "Jacob LeCoq"
 
 copyright_html = """
-© Jacob LeCoq and lecoqjacob.github.io, 2023. <br><br> \
+© Jacob LeCoq and n16hth4wkk.github.io, 2023. <br><br> \
 Unauthorized use and/or duplication of this material without express and written permission 
 from this site’s author and/or owner is strictly prohibited. \
 Excerpts and links may be used, provided that full and clear credit is given to Jacob LeCoq 
-and lecoqjacob.github.io with appropriate and specific direction to the original content \
+and n16hth4wkk.github.io with appropriate and specific direction to the original content \
 """
 
 # Whether to show links to earlier and later posts
@@ -68,5 +68,5 @@ menu_items = [
     { name = "about me", url = "$BASE_URL/about" },
 
     # set newtab to true to make the link open in new tab
-    { name = "github", url = "https://github.com/lecoqjacob", newtab = true },
+    { name = "github", url = "https://github.com/n16hth4wkk", newtab = true },
 ]
