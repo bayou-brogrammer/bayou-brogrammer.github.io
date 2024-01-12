@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Exploring Bevy Game of life shader (Part 4) | </title>
+    
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <meta name="robots" content="noodp"/>
+
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/style.css">
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/red.css">
+
+        <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/background_blue.css">
+    
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/font-hack-subset.css">
+
+    </head>
+
+<body class="">
+<div class="container">
+    
+    <header class="header">
+        <div class="header__inner">
+            <div class="header__logo">
+                    
+                <a href="https://n16hth4wkk.github.io" style="text-decoration: none;">
+                    <div class="logo">
+                      
+                            Yendor&#x27;s World
+                        
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        
+        
+                <nav class="menu">
+            <ul class="menu__inner">
+                <li class="active"><a href="https://n16hth4wkk.github.io">blog</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/tags">tags</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/archive">archive</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/about">about me</a></li>
+            
+                <li><a href="https://github.com/n16hth4wkk" target="_blank" rel="noopener noreferrer">github</a></li>
+            </ul>
+        </nav>
+    
+    
+        
+    </header>
+    
+
+    <div class="content">
+        
+    <div class="post">
+        
+    <h1 class="post-title"><a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-4/">Exploring Bevy Game of life shader (Part 4)</a></h1>
+    <div class="post-meta-inline">
+        
+    <span class="post-date">
+            2023-05-02
+        </span>
+
+    </div>
+
+    
+        <span class="post-tags-inline">
+                :: tags:&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/bevy/">#bevy</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/blog/">#blog</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/programming/">#programming</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/rust/">#rust</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/shader/">#shader</a></span>
+    
+
+        
+        <div class="post-content">
+            <p>I promised some additions to the original example provided so lets start with the easiest one, a simple camera controller.
+I just want to be able to pan around the simulation and zoom in a bit. I am going to run a cleanup and refactor for readability and
+cleanliness.</p>
+<ul>
+<li>Create three new files, <code>camera.rs</code>, <code>input.rs</code>, and <code>utils.rs</code>, along with the a foldr <code>pipeline</code>. It is important the pipeline folder is named exactly
+as the <code>pipeline.rs</code> file as I am not using <code>mod.rs</code> files.</li>
+<li>Move the function <code>create_image</code> into our utils folder and delete the image file.</li>
+<li>Inside <code>pipeline</code> folder create a <code>automata.rs</code> file and move all the pipeline code from our past
+three posts into it. This includes the <code>Pipeline</code>, <code>TextureBindGroup</code>, <code>State</code>, and <code>Node</code>.</li>
+</ul>
+<span id="continue-reading"></span>
+<p>I also renamed some things. Here is a mapping:</p>
+<ul>
+<li><code>Pipeline</code> -&gt; <code>AutomataPipeline</code></li>
+<li><code>GameOfLifeImageBindGroup</code> -&gt; <code>AutomataTextureBindGroup</code></li>
+<li><code>GameOfLifeState</code> -&gt; <code>AutomataState</code></li>
+<li><code>GameOfLifeNode</code> -&gt; <code>AutomataNode</code></li>
+</ul>
+<p>Lets add a simple plugin to host from this file at the top:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource, Clone, Deref, ExtractResource)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">GameOfLifeImage</span><span>(pub Handle&lt;Image&gt;);
+</span><span>
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">AutomataPipelinePlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">AutomataPipelinePlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">render_app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        render_app
+</span><span>            .init_resource::&lt;GameOfLifeAutomataPipeline&gt;()
+</span><span>            .add_system(queue_automata_bind_group.in_set(RenderSet::Queue));
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Back in the <code>pipeline.rs</code> file, it should be empty, so lets add another plugin to host all pipeline plugins.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">PipelinesPlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">PipelinesPlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> render_app = app.sub_app_mut(RenderApp);
+</span><span>        render_app
+</span><span>            .add_plugin(automata::AutomataPipelinePlugin);
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let mut</span><span> render_graph = render_app.world.resource_mut::&lt;RenderGraph&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> gol_id = render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life</span><span style="color:#556633;">&quot;</span><span>, automata::AutomataNode::default());
+</span><span>
+</span><span>        </span><span style="color:#888888;">/*
+</span><span style="color:#888888;">         * Automata Pipeline =&gt; Camera Driver
+</span><span style="color:#888888;">         */
+</span><span>        render_graph.add_node_edge(gol_id, bevy::render::main_graph::node::</span><span style="color:#7697d6;">CAMERA_DRIVER</span><span>);
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>We are moving the render_app implementation from our <code>ShaderPlaygroundPlugin</code> to this new <code>PipelinesPlugin</code>.
+Don't forget to add the <code>PipelinesPlugin</code> to the <code>ShaderPlaygroundPlugin</code> in <code>lib.rs</code>!</p>
+<h2 id="camera">Camera</h2>
+<p>Onto setting up a camera controller.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">const </span><span style="color:#7697d6;">CAMERA_MOVE_SPEED</span><span>: </span><span style="color:#8fbfdc;">f32 </span><span>= </span><span style="color:#cf6a4c;">500.0</span><span>;
+</span><span>
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">CameraPlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">CameraPlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        app.add_system(camera_controller);
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">camera_controller</span><span>(
+</span><span>    </span><span style="color:#ffb964;">time</span><span>: Res&lt;Time&gt;,
+</span><span>    </span><span style="color:#ffb964;">keyboard_input</span><span>: Res&lt;Input&lt;KeyCode&gt;&gt;,
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">mouse_wheel_events</span><span>: EventReader&lt;MouseWheel&gt;,
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">query</span><span>: Query&lt;(&amp;</span><span style="color:#8fbfdc;">mut</span><span> Transform, &amp;</span><span style="color:#8fbfdc;">mut</span><span> OrthographicProjection), With&lt;Camera&gt;&gt;,
+</span><span>) {
+</span><span>    </span><span style="color:#8fbfdc;">for </span><span>(</span><span style="color:#8fbfdc;">mut</span><span> transform, </span><span style="color:#8fbfdc;">mut</span><span> ortho) in query.iter_mut() {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> up = keyboard_input.pressed(KeyCode::W);
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> down = keyboard_input.pressed(KeyCode::S);
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> left = keyboard_input.pressed(KeyCode::A);
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> right = keyboard_input.pressed(KeyCode::D);
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> x_axis = right as </span><span style="color:#8fbfdc;">i8 </span><span>- left as </span><span style="color:#8fbfdc;">i8</span><span>;
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> y_axis = up as </span><span style="color:#8fbfdc;">i8 </span><span>- down as </span><span style="color:#8fbfdc;">i8</span><span>;
+</span><span>        </span><span style="color:#8fbfdc;">let mut</span><span> move_delta = Vec2::new(x_axis as </span><span style="color:#8fbfdc;">f32</span><span>, y_axis as </span><span style="color:#8fbfdc;">f32</span><span>);
+</span><span>
+</span><span>        </span><span style="color:#888888;">// =========== Move the camera around =========== //
+</span><span>        </span><span style="color:#8fbfdc;">if</span><span> move_delta != Vec2::</span><span style="color:#7697d6;">ZERO </span><span>{
+</span><span>            move_delta /= move_delta.length();
+</span><span>
+</span><span>            </span><span style="color:#8fbfdc;">let</span><span> z = transform.translation.z;
+</span><span>            transform.translation +=
+</span><span>                move_delta.extend(z) * </span><span style="color:#7697d6;">CAMERA_MOVE_SPEED </span><span>* time.delta_seconds();
+</span><span>
+</span><span>            </span><span style="color:#888888;">// Important! We need to restore the Z values when moving the camera around.
+</span><span>            </span><span style="color:#888888;">// Bevy has a specific camera setup and this can mess with how our layers are shown.
+</span><span>            transform.translation.z = z;
+</span><span>        }
+</span><span>
+</span><span>        </span><span style="color:#888888;">// =========== Zoom =========== //
+</span><span>        </span><span style="color:#8fbfdc;">for</span><span> MouseWheel { x, y, unit } in mouse_wheel_events.iter() {
+</span><span>            </span><span style="color:#8fbfdc;">let mut</span><span> x_scroll_diff = </span><span style="color:#cf6a4c;">0.0</span><span>;
+</span><span>            </span><span style="color:#8fbfdc;">let mut</span><span> y_scroll_diff = </span><span style="color:#cf6a4c;">0.0</span><span>;
+</span><span>
+</span><span>            </span><span style="color:#8fbfdc;">match</span><span> unit {
+</span><span>                MouseScrollUnit::Line =&gt; {
+</span><span>                    x_scroll_diff += x;
+</span><span>                    y_scroll_diff += y;
+</span><span>                }
+</span><span>                MouseScrollUnit::Pixel =&gt; {
+</span><span>                    </span><span style="color:#888888;">// I just took this from three-rs, no idea why this magic number was chosen ¯\_(ツ)_/¯
+</span><span>                    </span><span style="color:#8fbfdc;">const </span><span style="color:#7697d6;">PIXELS_PER_LINE</span><span>: </span><span style="color:#8fbfdc;">f32 </span><span>= </span><span style="color:#cf6a4c;">38.0</span><span>;
+</span><span>
+</span><span>                    y_scroll_diff += y / </span><span style="color:#7697d6;">PIXELS_PER_LINE</span><span>;
+</span><span>                    x_scroll_diff += x / </span><span style="color:#7697d6;">PIXELS_PER_LINE</span><span>;
+</span><span>                }
+</span><span>            }
+</span><span>
+</span><span>            </span><span style="color:#8fbfdc;">if</span><span> x_scroll_diff != </span><span style="color:#cf6a4c;">0.0 </span><span>|| y_scroll_diff != </span><span style="color:#cf6a4c;">0.0 </span><span>{
+</span><span>                </span><span style="color:#8fbfdc;">if</span><span> y_scroll_diff &lt; </span><span style="color:#cf6a4c;">0.0 </span><span>{
+</span><span>                    ortho.scale *= </span><span style="color:#cf6a4c;">1.05</span><span>;
+</span><span>                } </span><span style="color:#8fbfdc;">else </span><span>{
+</span><span>                    ortho.scale *= </span><span style="color:#cf6a4c;">1.0 </span><span>/ </span><span style="color:#cf6a4c;">1.05</span><span>;
+</span><span>                }
+</span><span>
+</span><span>                ortho.scale = ortho.scale.clamp(</span><span style="color:#cf6a4c;">0.15</span><span>, </span><span style="color:#cf6a4c;">5.</span><span>);
+</span><span>            }
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span><span>...
+</span><span>
+</span><span style="color:#888888;">// in our ShaderPlaygroundPlugin
+</span><span>
+</span><span>app
+</span><span>    </span><span style="color:#888888;">// Extract the game of life image resource from the main world into the render world
+</span><span>    </span><span style="color:#888888;">// for operation on by the compute shader and display on the sprite.
+</span><span>    .add_plugin(ExtractResourcePlugin::&lt;GameOfLifeImage&gt;::default())
+</span><span>    .add_plugin(camera::CameraPlugin)
+</span><span>    .add_startup_system(setup);
+</span><span>...
+</span></code></pre>
+<p>A simple camera controller. We generate a move delta based on the pressed keys and then using bevy's builtin time resource, manipulate the
+camera's position for buttery smooth movement. Adjust the movement constant to your liking. The zoom just listens for scroll events and adjusts
+the orthographic projection's scale. The <code>MouseScrollUnit::Pixel</code> case is taken from an online example I found. I don't know what triggers a
+<code>MouseScrollUnit::Pixel</code>, but I have only seen <code>Line</code> units so far, but better safe than sorry!</p>
+<p>To better see that our camera works well, you can replace the <code>ClearColor(Color::BLACK)</code> with <code>ClearColor(Color::WHITE)</code>.
+You should now be able to pan aroundthe simulation and also zoom!You should now be able to pan around</p>
+
+  <img src="/images/gol_camera.gif" class="center" />
+
+<p>The main thing I want this part to focus on would be drawing onto our canvas. We will be using <em>ANOTHER</em> ;) compute pipeline to handle this for us.
+Lets setup the mouse positioning system that will be used.</p>
+<p>Setting up our input bindings lets fill out <code>input.rs</code> file.</p>
+<p>We need a resource to hold our mouse position, previous mouse position, and if our mouse button is down.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">InputPlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">InputPlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        app.init_resource::&lt;InputState&gt;();
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Default, Resource, ExtractResource, Clone)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">InputState </span><span>{
+</span><span>    </span><span style="color:#ffb964;">mouse_pos</span><span>: Vec2,
+</span><span>    </span><span style="color:#ffb964;">prev_mouse_pos</span><span>: Vec2,
+</span><span>    </span><span style="color:#ffb964;">left_button_down</span><span>: </span><span style="color:#8fbfdc;">bool</span><span>,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span style="color:#ffb964;">InputState </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">mouse_canvas_pos</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>) -&gt; Vec2 {
+</span><span>        </span><span style="color:#ffb964;">self</span><span>.mouse_pos
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">prev_mouse_canvas_pos</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>) -&gt; Vec2 {
+</span><span>        </span><span style="color:#ffb964;">self</span><span>.prev_mouse_pos
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">is_drawing</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>) -&gt; </span><span style="color:#8fbfdc;">bool </span><span>{
+</span><span>        </span><span style="color:#ffb964;">self</span><span>.left_button_down
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">update_input_state</span><span>(
+</span><span>    </span><span style="color:#ffb964;">window_query</span><span>: Query&lt;&amp;Window&gt;,
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">input_state</span><span>: ResMut&lt;InputState&gt;,
+</span><span>    </span><span style="color:#ffb964;">camera_q</span><span>: Query&lt;(&amp;Camera, &amp;GlobalTransform)&gt;,
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">mouse_button_input_events</span><span>: EventReader&lt;MouseButtonInput&gt;,
+</span><span>) {
+</span><span>    </span><span style="color:#8fbfdc;">let </span><span>Ok(primary_window) = window_query.get_single() </span><span style="color:#8fbfdc;">else </span><span>{ </span><span style="color:#8fbfdc;">return </span><span>};
+</span><span>    </span><span style="color:#888888;">// get the camera info and transform
+</span><span>    </span><span style="color:#8fbfdc;">let </span><span>Ok((camera, camera_transform)) = camera_q.get_single() </span><span style="color:#8fbfdc;">else </span><span>{ </span><span style="color:#8fbfdc;">return </span><span>};
+</span><span>
+</span><span>    </span><span style="color:#888888;">// Determine button state
+</span><span>    </span><span style="color:#8fbfdc;">for</span><span> event in mouse_button_input_events.iter() {
+</span><span>        </span><span style="color:#8fbfdc;">if</span><span> event.button == MouseButton::Left {
+</span><span>            input_state.left_button_down = event.state == ButtonState::Pressed;
+</span><span>        }
+</span><span>    }
+</span><span>    ...
+</span><span>}
+</span></code></pre>
+<p>Mouse button is a simple event reader. The previous and current mouse position is a bit more complicated as we need to convert from world space to canvas space.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">if let </span><span>Some(world_position) = primary_window
+</span><span>    .cursor_position()
+</span><span>    .and_then(|</span><span style="color:#ffb964;">cursor</span><span>| camera.viewport_to_world(camera_transform, cursor))
+</span><span>    .map(|</span><span style="color:#ffb964;">ray</span><span>| ray.origin.truncate())
+</span><span>{
+</span><span>}
+</span></code></pre>
+<p>Grabbing the world_position from the window and camera is ripped from the <a href="https://bevy-cheatbook.github.io/cookbook/cursor2world.html">bevy cheatbook</a>. Now
+that we have the world coordinates, we need a way to transform them into curstor coordinates. In utils add a function:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>use bevy::prelude::Vec2;
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">world_pos_to_canvas_pos</span><span>(</span><span style="color:#ffb964;">world_pos</span><span>: Vec2) -&gt; Vec2 {
+</span><span>    world_pos
+</span><span>        + Vec2::new(
+</span><span>            crate::</span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">0 </span><span>as </span><span style="color:#8fbfdc;">f32 </span><span>/ </span><span style="color:#cf6a4c;">2.0</span><span>,
+</span><span>            crate::</span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">1 </span><span>as </span><span style="color:#8fbfdc;">f32 </span><span>/ </span><span style="color:#cf6a4c;">2.0</span><span>,
+</span><span>        )
+</span><span>}
+</span></code></pre>
+<p>This just takes the world position and adds half the size of the canvas to it. Finish off the input system.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">if let </span><span>Some(world_position) = primary_window
+</span><span>    .cursor_position()
+</span><span>    .and_then(|</span><span style="color:#ffb964;">cursor</span><span>| camera.viewport_to_world(camera_transform, cursor))
+</span><span>    .map(|</span><span style="color:#ffb964;">ray</span><span>| ray.origin.truncate())
+</span><span>{
+</span><span>    input_state.prev_mouse_pos = input_state.mouse_pos; </span><span style="color:#888888;">// NEW
+</span><span>    input_state.mouse_pos =
+</span><span>        crate::utils::world_pos_to_canvas_pos(world_position * Vec2::new(</span><span style="color:#cf6a4c;">1.0</span><span>, -</span><span style="color:#cf6a4c;">1.0</span><span>)); </span><span style="color:#888888;">// NEW
+</span><span>}
+</span></code></pre>
+<p><code>world_position * Vec2::new(1.0, -1.0)</code> is just flipping the y axis since images have y going down and wgpu has y going up.</p>
+<p>Add the input plugin to the <code>ShaderPlaygroundPlugin</code>.</p>
+<h2 id="draw-pipeline">Draw Pipeline</h2>
+<p>We are going to need <code>bytemuck</code> so add that to your project with <code>cargo add bytemuck</code>.</p>
+<p>Add a new file in <code>pipeline</code> folder called draw. This is going to look really similar to the automata setup, just with a few minor tweaks.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">AutomataDrawPipelinePlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">AutomataDrawPipelinePlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">render_app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        render_app
+</span><span>            .init_resource::&lt;AutomataDrawPipeline&gt;()
+</span><span>            .add_system(queue_draw_bind_group.in_set(RenderSet::Queue));
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style="color:#888888;">// ================================== Contants ================================== //
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">repr</span><span>(C)]
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">AutomataPushConstants </span><span>{
+</span><span>    </span><span style="color:#ffb964;">draw_start</span><span>: [</span><span style="color:#8fbfdc;">f32</span><span>; 2],
+</span><span>    </span><span style="color:#ffb964;">draw_end</span><span>: [</span><span style="color:#8fbfdc;">f32</span><span>; 2],
+</span><span>    </span><span style="color:#ffb964;">draw_radius</span><span>: </span><span style="color:#8fbfdc;">f32</span><span>,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span style="color:#ffb964;">AutomataPushConstants </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">new</span><span>(</span><span style="color:#ffb964;">draw_start</span><span>: Vec2, </span><span style="color:#ffb964;">draw_end</span><span>: Vec2, </span><span style="color:#ffb964;">draw_radius</span><span>: </span><span style="color:#8fbfdc;">f32</span><span>) -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>        </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>            draw_radius,
+</span><span>            draw_end: draw_end.to_array(),
+</span><span>            draw_start: draw_start.to_array(),
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>This new struct holds our push constants that we will pass to our draw pipeline shader.</p>
+<blockquote>
+<p>PushConstants are a way to pass data to a shader without having to create a buffer. The downside is that the data is limited and is much smaller
+than the limit on buffers. The upside is that it is faster than buffers.</p>
+</blockquote>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>
+</span><span style="color:#888888;">// ================================== Pipeline ================================== //
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">AutomataDrawPipeline </span><span>{
+</span><span>    </span><span style="color:#ffb964;">draw_pipeline</span><span>: CachedComputePipelineId,
+</span><span>    </span><span style="color:#ffb964;">draw_bind_group_layout</span><span>: BindGroupLayout,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span>FromWorld for </span><span style="color:#ffb964;">AutomataDrawPipeline </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">from_world</span><span>(</span><span style="color:#ffb964;">world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> draw_bind_group_layout =
+</span><span>            world
+</span><span>                .resource::&lt;RenderDevice&gt;()
+</span><span>                .create_bind_group_layout(&amp;BindGroupLayoutDescriptor {
+</span><span>                    label: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Bind Group Layout</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>                    entries: &amp;[BindGroupLayoutEntry {
+</span><span>                        binding: </span><span style="color:#cf6a4c;">0</span><span>,
+</span><span>                        visibility: ShaderStages::</span><span style="color:#7697d6;">COMPUTE</span><span>,
+</span><span>                        ty: BindingType::StorageTexture {
+</span><span>                            access: StorageTextureAccess::ReadWrite,
+</span><span>                            format: TextureFormat::Rgba8Unorm,
+</span><span>                            view_dimension: TextureViewDimension::</span><span style="color:#7697d6;">D2</span><span>,
+</span><span>                        },
+</span><span>                        count: None,
+</span><span>                    }],
+</span><span>                });
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> brush_shader = world.resource::&lt;AssetServer&gt;().load(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">shaders/draw.wgsl</span><span style="color:#556633;">&quot;</span><span>);
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> draw_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+</span><span>            shader: brush_shader,
+</span><span>            shader_defs: vec![],
+</span><span>            entry_point: Cow::from(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">draw</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>            layout: vec![draw_bind_group_layout.clone()],
+</span><span>            label: Some(std::borrow::Cow::Borrowed(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Draw Pipeline</span><span style="color:#556633;">&quot;</span><span>)),
+</span><span>            push_constant_ranges: [PushConstantRange {
+</span><span>                stages: ShaderStages::</span><span style="color:#7697d6;">COMPUTE</span><span>,
+</span><span>                range: </span><span style="color:#cf6a4c;">0</span><span>..std::mem::size_of::&lt;AutomataPushConstants&gt;() as </span><span style="color:#8fbfdc;">u32</span><span>,
+</span><span>            }]
+</span><span>            .to_vec(),
+</span><span>        });
+</span><span>
+</span><span>        AutomataDrawPipeline {
+</span><span>            draw_pipeline,
+</span><span>            draw_bind_group_layout,
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Our draw_pipeline has a new value: <code>push_constant_ranges</code>. The <code>push_constant_ranges</code> is a range of bytes that can be passed to the shader via <code>PushConstants</code>.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#888888;">// ================================== BindGroup ================================== //
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource)]
+</span><span style="color:#8fbfdc;">struct </span><span style="color:#ffb964;">AutomataDrawBindGroup</span><span>(pub BindGroup);
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">queue_draw_bind_group</span><span>(
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">commands</span><span>: Commands,
+</span><span>    </span><span style="color:#ffb964;">render_device</span><span>: Res&lt;RenderDevice&gt;,
+</span><span>    </span><span style="color:#ffb964;">pipeline</span><span>: Res&lt;AutomataDrawPipeline&gt;,
+</span><span>    </span><span style="color:#ffb964;">gpu_images</span><span>: Res&lt;RenderAssets&lt;Image&gt;&gt;,
+</span><span>    </span><span style="color:#ffb964;">game_of_life_image</span><span>: Res&lt;GameOfLifeImage&gt;,
+</span><span>) {
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> view = &amp;gpu_images[&amp;game_of_life_image.</span><span style="color:#cf6a4c;">0</span><span>];
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> draw_bind_group = render_device.create_bind_group(&amp;BindGroupDescriptor {
+</span><span>        label: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Draw Bind Group</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>        layout: &amp;pipeline.draw_bind_group_layout,
+</span><span>        entries: &amp;[BindGroupEntry {
+</span><span>            binding: </span><span style="color:#cf6a4c;">0</span><span>,
+</span><span>            resource: BindingResource::TextureView(&amp;view.texture_view),
+</span><span>        }],
+</span><span>    });
+</span><span>    commands.insert_resource(AutomataDrawBindGroup(draw_bind_group));
+</span><span>}
+</span><span>
+</span><span style="color:#888888;">// ================================== Nodes ================================== //
+</span><span style="color:#8fbfdc;">pub enum </span><span style="color:#ffb964;">AutomataDrawState </span><span>{
+</span><span>    Loading,
+</span><span>    Update,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">AutomataDrawNode </span><span>{
+</span><span>    </span><span style="color:#ffb964;">state</span><span>: AutomataDrawState,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span>Default for </span><span style="color:#ffb964;">AutomataDrawNode </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">default</span><span>() -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>        </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>            state: AutomataDrawState::Loading,
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Our node only has two states: Loading and Update as we don't need to initialize anything.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">impl </span><span>render_graph::Node for </span><span style="color:#ffb964;">AutomataDrawNode </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">update</span><span>(&amp;</span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline = world.resource::&lt;AutomataDrawPipeline&gt;();
+</span><span>
+</span><span>        </span><span style="color:#888888;">// if the corresponding pipeline has loaded, transition to the next stage
+</span><span>        </span><span style="color:#8fbfdc;">match </span><span style="color:#ffb964;">self</span><span>.state {
+</span><span>            AutomataDrawState::Loading =&gt; {
+</span><span>                </span><span style="color:#8fbfdc;">if let </span><span>CachedPipelineState::Ok(_) =
+</span><span>                    pipeline_cache.get_compute_pipeline_state(pipeline.draw_pipeline)
+</span><span>                {
+</span><span>                    </span><span style="color:#ffb964;">self</span><span>.state = AutomataDrawState::Update;
+</span><span>                }
+</span><span>            }
+</span><span>            AutomataDrawState::Update =&gt; {}
+</span><span>        }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">run</span><span>(
+</span><span>        &amp;</span><span style="color:#ffb964;">self</span><span>,
+</span><span>        </span><span style="color:#ffb964;">_graph</span><span>: &amp;</span><span style="color:#8fbfdc;">mut </span><span>render_graph::RenderGraphContext,
+</span><span>        </span><span style="color:#ffb964;">render_context</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> RenderContext,
+</span><span>        </span><span style="color:#ffb964;">world</span><span>: &amp;World,
+</span><span>    ) -&gt; Result&lt;(), render_graph::NodeRunError&gt; {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> input_state = &amp;world.resource::&lt;InputState&gt;();
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">if</span><span> input_state.is_drawing() {
+</span><span>            </span><span style="color:#8fbfdc;">let</span><span> texture_bind_group = &amp;world.resource::&lt;AutomataTextureBindGroup&gt;().</span><span style="color:#cf6a4c;">0</span><span>;
+</span><span>            </span><span style="color:#8fbfdc;">let</span><span> draw_bind_group = &amp;world.resource::&lt;AutomataDrawBindGroup&gt;().</span><span style="color:#cf6a4c;">0</span><span>;
+</span><span>            </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>            </span><span style="color:#8fbfdc;">let</span><span> pipeline = world.resource::&lt;AutomataDrawPipeline&gt;();
+</span><span>
+</span><span>            </span><span style="color:#8fbfdc;">let mut</span><span> pass = render_context
+</span><span>                .command_encoder()
+</span><span>                .begin_compute_pass(&amp;ComputePassDescriptor::default());
+</span><span>
+</span><span>            pass.set_bind_group(</span><span style="color:#cf6a4c;">0</span><span>, texture_bind_group, &amp;[]);
+</span><span>
+</span><span>            </span><span style="color:#888888;">// select the pipeline based on the current state
+</span><span>            </span><span style="color:#8fbfdc;">match </span><span style="color:#ffb964;">self</span><span>.state {
+</span><span>                AutomataDrawState::Loading =&gt; {}
+</span><span>                AutomataDrawState::Update =&gt; {
+</span><span>                    </span><span style="color:#8fbfdc;">let</span><span> draw_pipeline = pipeline_cache
+</span><span>                        .get_compute_pipeline(pipeline.draw_pipeline)
+</span><span>                        .unwrap();
+</span><span>
+</span><span>                    </span><span style="color:#8fbfdc;">let</span><span> pc = AutomataPushConstants::new(
+</span><span>                        input_state.mouse_canvas_pos(),
+</span><span>                        input_state.prev_mouse_canvas_pos(),
+</span><span>                        </span><span style="color:#cf6a4c;">10.0</span><span>,
+</span><span>                    );
+</span><span>
+</span><span>                    pass.set_pipeline(draw_pipeline);
+</span><span>                    pass.set_bind_group(</span><span style="color:#cf6a4c;">0</span><span>, draw_bind_group, &amp;[]);
+</span><span>                    pass.set_push_constants(</span><span style="color:#cf6a4c;">0</span><span>, bytemuck::cast_slice(&amp;[pc]));
+</span><span>                    pass.dispatch_workgroups(
+</span><span>                        </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">0 </span><span>/ </span><span style="color:#7697d6;">WORKGROUP_SIZE</span><span>,
+</span><span>                        </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">1 </span><span>/ </span><span style="color:#7697d6;">WORKGROUP_SIZE</span><span>,
+</span><span>                        </span><span style="color:#cf6a4c;">1</span><span>,
+</span><span>                    );
+</span><span>                }
+</span><span>            }
+</span><span>        }
+</span><span>
+</span><span>        Ok(())
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Inside our run, we first check to see if we are drawing at all. If so, we pull the current mouse position as well as the previous mouse position and instantiate the <code>AutomataPushConstants</code> with a radius of 10.0.
+We then setup the pipeline and add the push constants with <code>bytemuck::cast_slice</code>.</p>
+<p>With that, our draw pipeline is complete and ready. Lets add it to our pipelines plugin:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">PipelinesPlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> render_app = app.sub_app_mut(RenderApp);
+</span><span>        render_app
+</span><span>            .add_plugin(draw::AutomataDrawPipelinePlugin)
+</span><span>            .add_plugin(automata::AutomataPipelinePlugin);
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let mut</span><span> render_graph = render_app.world.resource_mut::&lt;RenderGraph&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> gol_id = render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life</span><span style="color:#556633;">&quot;</span><span>, automata::AutomataNode::default());
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> draw_id = render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life_draw</span><span style="color:#556633;">&quot;</span><span>, draw::AutomataDrawNode::default());
+</span><span>        ...
+</span></code></pre>
+<p>We now have a new node to use in our render graph! We want the <code>draw_node</code> to run  before our <code>automata_node</code>.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">let mut</span><span> render_graph = render_app.world.resource_mut::&lt;RenderGraph&gt;();
+</span><span style="color:#8fbfdc;">let</span><span> gol_id = render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life</span><span style="color:#556633;">&quot;</span><span>, automata::AutomataNode::default());
+</span><span style="color:#8fbfdc;">let</span><span> draw_id = render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life_draw</span><span style="color:#556633;">&quot;</span><span>, draw::AutomataDrawNode::default());
+</span><span>
+</span><span style="color:#888888;">/*
+</span><span style="color:#888888;">* Draw Pipeline =&gt; Automata Pipeline =&gt; Camera Driver
+</span><span style="color:#888888;">*/
+</span><span>render_graph.add_node_edge(draw_id, gol_id);
+</span><span>render_graph.add_node_edge(gol_id, bevy::render::main_graph::node::</span><span style="color:#7697d6;">CAMERA_DRIVER</span><span>);
+</span></code></pre>
+<p>This creates a new edge from the <code>draw_node</code> to the <code>automata_node</code> and then from the <code>automata_node</code> to the <code>camera_driver</code>! Onto the draw shader!!</p>
+<h2 id="draw-shader">Draw Shader</h2>
+<p>create a file called <code>draw.wgsl</code> in our <code>shaders</code> folder and add the following starter code:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span style="color:#8fbfdc;">struct </span><span style="color:#ffb964;">PushConstants </span><span>{
+</span><span>    draw_start: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;,
+</span><span>    draw_end: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;,
+</span><span>    draw_radius: f32,
+</span><span>}
+</span><span>var&lt;push_constant&gt; pc: PushConstants;
+</span><span>
+</span><span>@</span><span style="color:#ffb964;">group</span><span>(</span><span style="color:#cf6a4c;">0</span><span>) @</span><span style="color:#ffb964;">binding</span><span>(</span><span style="color:#cf6a4c;">0</span><span>)
+</span><span>var texture: texture_storage_2d&lt;rgba8unorm, read_write&gt;;
+</span><span>
+</span><span>@compute @</span><span style="color:#ffb964;">workgroup_size</span><span>(</span><span style="color:#cf6a4c;">8</span><span>, </span><span style="color:#cf6a4c;">8</span><span>, </span><span style="color:#cf6a4c;">1</span><span>)
+</span><span>fn </span><span style="color:#fad07a;">draw</span><span>(@</span><span style="color:#ffb964;">builtin</span><span>(global_invocation_id) invocation_id: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;)
+</span><span>{
+</span><span>    let pixel = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;u32&gt;(invocation_id.</span><span style="color:#ffb964;">xy</span><span>);
+</span><span>    let size = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;u32&gt;(</span><span style="color:#ffb964;">textureDimensions</span><span>(texture));
+</span><span>    </span><span style="color:#8fbfdc;">if </span><span>(pixel.</span><span style="color:#ffb964;">x </span><span>&gt;= size.</span><span style="color:#ffb964;">x </span><span>&amp;&amp; pixel.</span><span style="color:#ffb964;">y </span><span>&gt;= size.</span><span style="color:#ffb964;">y</span><span>) {
+</span><span>        </span><span style="color:#8fbfdc;">return </span><span>;
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#888888;">// Draw circle
+</span><span>    </span><span style="color:#8fbfdc;">if </span><span>(pc.</span><span style="color:#ffb964;">draw_radius </span><span>&gt; </span><span style="color:#cf6a4c;">0.0</span><span>) {
+</span><span>
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>This is all familiar except for the new push_contant and a new function: <code>textureDimensions</code>. The <code>push_contant</code> variable should match what we are passing from
+rust side of things. We are passing in the start and end of the mouse position as well as the radius of the circle we want to draw.</p>
+<p><code>textureDimensions</code> function returns the dimensions of the texture we are sampling from.We use this to check if the current pixel is outside of the texture
+bounds.</p>
+<p>Now we pass in a <code>start</code> and <code>end</code> position, so we need to generate a line between these two points. Searching the web I found the following stackoverflow
+thread with many examples: <a href="https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment">shortest-distance-between-a-point-and-a-line-segment</a></p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span style="color:#888888;">// Line v-&gt;w, point p
+</span><span style="color:#888888;">// https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+</span><span>fn </span><span style="color:#fad07a;">closest_point_on_line</span><span>(v: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;, w: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;, p: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;) -&gt; </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt; {
+</span><span>    let c = v - w;
+</span><span>
+</span><span>    </span><span style="color:#888888;">// length squared
+</span><span>    let l2 = dot(c, c);
+</span><span>    </span><span style="color:#8fbfdc;">if </span><span>(l2 == </span><span style="color:#cf6a4c;">0.0</span><span>) {
+</span><span>        </span><span style="color:#8fbfdc;">return</span><span> v;
+</span><span>    }
+</span><span>
+</span><span>    let t = max(</span><span style="color:#cf6a4c;">0.0</span><span>, min(</span><span style="color:#cf6a4c;">1.0</span><span>, dot(p - v, w - v) / l2));
+</span><span>    let projection = v + t * (w - v);
+</span><span>    </span><span style="color:#8fbfdc;">return</span><span> projection;
+</span><span>}
+</span></code></pre>
+<blockquote>
+<p>Challenge: Feel free to scower the web for your own implementation and try replacing my implementation with yours!</p>
+</blockquote>
+<p>Using this in our <code>draw</code> function:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span style="color:#888888;">// Draw circle
+</span><span>    </span><span style="color:#8fbfdc;">if </span><span>(pc.</span><span style="color:#ffb964;">draw_radius </span><span>&gt; </span><span style="color:#cf6a4c;">0.0</span><span>) {
+</span><span>        let pos = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;(pixel);
+</span><span>        let point_on_line = </span><span style="color:#ffb964;">closest_point_on_line</span><span>(pc.</span><span style="color:#ffb964;">draw_start</span><span>, pc.</span><span style="color:#ffb964;">draw_end</span><span>, pos);
+</span><span>    }
+</span></code></pre>
+<p>We need to cast our <code>pixel</code> variable to an f32 to be used by our <code>closest_point_on_line</code> function. We can now use this point to draw with. Add a new function
+for drawing a circle:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">draw_particle_circle</span><span>(pos: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;, draw_pos: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;, radius: </span><span style="color:#ffb964;">f32</span><span>) {
+</span><span>    let y_start = draw_pos.</span><span style="color:#ffb964;">y </span><span>- radius;
+</span><span>    let y_end = draw_pos.</span><span style="color:#ffb964;">y </span><span>+ radius;
+</span><span>    let x_start = draw_pos.</span><span style="color:#ffb964;">x </span><span>- radius;
+</span><span>    let x_end = draw_pos.</span><span style="color:#ffb964;">x </span><span>+ radius;
+</span><span>    </span><span style="color:#8fbfdc;">if </span><span>(pos.</span><span style="color:#ffb964;">x </span><span>&gt;= x_start &amp;&amp; pos.</span><span style="color:#ffb964;">x </span><span>&lt;= x_end &amp;&amp; pos.</span><span style="color:#ffb964;">y </span><span>&gt;= y_start &amp;&amp; pos.</span><span style="color:#ffb964;">y </span><span>&lt;= y_end) {
+</span><span>        let diff = pos - draw_pos;
+</span><span>        let dist = length(diff);
+</span><span>        </span><span style="color:#8fbfdc;">if </span><span>(</span><span style="color:#ffb964;">round</span><span>(dist) &lt;= radius) {
+</span><span>            </span><span style="color:#ffb964;">textureStore</span><span>(texture, </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;(pos), </span><span style="color:#8fbfdc;">vec4</span><span>&lt;f32&gt;(</span><span style="color:#cf6a4c;">1.0</span><span>, </span><span style="color:#cf6a4c;">1.0</span><span>, </span><span style="color:#cf6a4c;">1.0</span><span>, </span><span style="color:#cf6a4c;">1.0</span><span>));
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>This looks pretty similar to how you would draw a circle on the rust side. We create a bounding box based on the radius and make sure our click position
+falls within that box. If it does, we calculate the distance from the click position to the current pixel and if that distance is less than or equal to
+the radius, we store an alive cell at that position. (remember our alive cells are marked by a 1.0 value in the r channel of the pixel color).</p>
+<p>Finish off our shader:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span style="color:#888888;">// Draw circle
+</span><span style="color:#8fbfdc;">if </span><span>(pc.</span><span style="color:#ffb964;">draw_radius </span><span>&gt; </span><span style="color:#cf6a4c;">0.0</span><span>) {
+</span><span>    let pos = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;f32&gt;(pixel);
+</span><span>    let point_on_line = </span><span style="color:#ffb964;">closest_point_on_line</span><span>(pc.</span><span style="color:#ffb964;">draw_start</span><span>, pc.</span><span style="color:#ffb964;">draw_end</span><span>, pos);
+</span><span>    </span><span style="color:#ffb964;">draw_particle_circle</span><span>(pos, point_on_line, pc.</span><span style="color:#ffb964;">draw_radius</span><span>);
+</span><span>}
+</span></code></pre>
+<h2 id="complete">Complete</h2>
+<p>Running the example you should be able to draw on the simulation with your mouse:</p>
+
+  <img src="/images/gol_4_drawing.gif" class="center" />
+
+<h2 id="bonus">Bonus</h2>
+<p>One thing you might notice is our simulation doesnt wrap between the edges. We can fix this by maniupulating our <code>game_of_life.wgsl</code> slightly.
+In the <code>is_alive</code> function we can add the following:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">is_alive</span><span>(location: </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;, offset_x: </span><span style="color:#ffb964;">i32</span><span>, offset_y: </span><span style="color:#ffb964;">i32</span><span>) -&gt; u32 {
+</span><span>    let size = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;(</span><span style="color:#ffb964;">textureDimensions</span><span>(texture));
+</span><span>    var loc = ((location + </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;(offset_x, offset_y)) + size) % size;
+</span><span>    let value: </span><span style="color:#8fbfdc;">vec4</span><span>&lt;f32&gt; = </span><span style="color:#ffb964;">textureLoad</span><span>(texture, loc);
+</span><span>    </span><span style="color:#8fbfdc;">return </span><span style="color:#ffb964;">u32</span><span>(value.</span><span style="color:#ffb964;">x</span><span>);
+</span><span>}
+</span></code></pre>
+<p>I broke out the calculations onto multiple lines for readability. We first get the dimensions of the texture we are sampling from. We then add the offset
+to the current location, add the size to that result and finally mod the result by the size. This will wrap the edges of the texture both x and y.</p>
+<p>With that, our cells will now wrap around the edges of the simulation! Awesome!</p>
+<blockquote>
+<p>Challenge: Create a method to draw a square instead of a circle. For even more complexity, you can add a push_constant bool to pass in
+whether you want to draw a circle or a square.</p>
+</blockquote>
+<p>Code can be found on github: <a href="https://github.com/n16hth4wkk/bevy_shader_playground/tree/237f23dffe3b52ba363442e6f68e8925441bd0d3">Part 4</a></p>
+
+        </div>
+
+        
+        <div class="pagination">
+            <div class="pagination__title">
+                <span class="pagination__title-h">Thanks for reading! Read other posts?</span>
+                <hr />
+            </div>
+            <div class="pagination__buttons">
+                    <span class="button previous">
+                        <a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-3/">
+                            <span class="button__icon">←</span>&nbsp;
+                            <span class="button__text">Exploring Bevy Game of life shader (Part 3)</span>
+                        </a>
+                    </span>
+                
+                
+                    <span class="button next">
+                        <a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-5/">
+                            <span class="button__text">Exploring Bevy Game of life shader (Part 5)</span>&nbsp;
+                            <span class="button__icon">→</span>
+                        </a>
+                    </span>
+                </div>
+        </div>
+    
+    </div>
+
+    </div>
+
+    
+    <footer class="footer">
+        <div class="footer__inner">
+                <div class="copyright copyright--user">© Jacob LeCoq and n16hth4wkk.github.io, 2023. <br><br> Unauthorized use and/or duplication of this material without express and written permission 
+from this site’s author and/or owner is strictly prohibited. Excerpts and links may be used, provided that full and clear credit is given to Jacob LeCoq 
+and n16hth4wkk.github.io with appropriate and specific direction to the original content </div>
+            </div>
+    </footer>
+    
+
+</div>
+</body>
+
+</html>

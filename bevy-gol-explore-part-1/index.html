@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Exploring Bevy Game of life shader (Part 1) | </title>
+    
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <meta name="robots" content="noodp"/>
+
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/style.css">
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/red.css">
+
+        <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/background_blue.css">
+    
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/font-hack-subset.css">
+
+    </head>
+
+<body class="">
+<div class="container">
+    
+    <header class="header">
+        <div class="header__inner">
+            <div class="header__logo">
+                    
+                <a href="https://n16hth4wkk.github.io" style="text-decoration: none;">
+                    <div class="logo">
+                      
+                            Yendor&#x27;s World
+                        
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        
+        
+                <nav class="menu">
+            <ul class="menu__inner">
+                <li class="active"><a href="https://n16hth4wkk.github.io">blog</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/tags">tags</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/archive">archive</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/about">about me</a></li>
+            
+                <li><a href="https://github.com/n16hth4wkk" target="_blank" rel="noopener noreferrer">github</a></li>
+            </ul>
+        </nav>
+    
+    
+        
+    </header>
+    
+
+    <div class="content">
+        
+    <div class="post">
+        
+    <h1 class="post-title"><a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-1/">Exploring Bevy Game of life shader (Part 1)</a></h1>
+    <div class="post-meta-inline">
+        
+    <span class="post-date">
+            2023-05-01
+        </span>
+
+    </div>
+
+    
+        <span class="post-tags-inline">
+                :: tags:&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/bevy/">#bevy</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/blog/">#blog</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/programming/">#programming</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/rust/">#rust</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/shader/">#shader</a></span>
+    
+
+        
+        <div class="post-content">
+            <p>Recently, I have found myself facinated by graphical programming. On the side, I started following a tutorial by <a href="https://github.com/hakolao">hakolao</a>,
+which explores compute shaders with <a href="https://github.com/bevyengine/bevy">bevy</a> using <a href="https://github.com/vulkano-rs/vulkano">vulkano</a>. If you are interested,
+this is the tutorial <a href="https://github.com/hakolao/compute_shader_tutorial">compute_shader_tutorial</a>.</p>
+<p>As a fun exercise, I decided to explore using compute shaders using wgpu within bevy. This is part 1 of exploring bevy game of life shader example, and
+some ways to enhance the experience.</p>
+<span id="continue-reading"></span>
+<p>I assume you have general knowledge of rust, bevy, and wgpu, but I will still explain somethings along the way. If you need a refresher on anything, here
+are some helpful resources:</p>
+<p><a href="https://doc.rust-lang.org/book/">Learn Rust</a>
+<a href="https://bevyengine.org/learn/book/introduction/">Bevy Book</a>
+<a href="https://bevy-cheatbook.github.io/">Bevy Cheatbook</a>
+<a href="https://sotrh.github.io/learn-wgpu/">Learn Wgpu</a></p>
+<p>So lets get started!</p>
+<h2 id="setup">Setup</h2>
+<p>This tutorial currently follows along using Bevy 0.10.</p>
+<p>I am using the <a href="https://github.com/NiklasEi/bevy_game_template">bevy_game_template</a> as my starter, just with all the extra code ripped out, except for main and lib.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#888888;">// main.rs
+</span><span>
+</span><span style="color:#888888;">// &lt;imports&gt;
+</span><span>...
+</span><span>
+</span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">main</span><span>() {
+</span><span>    App::new()
+</span><span>        .insert_resource(ClearColor(Color::</span><span style="color:#7697d6;">BLACK</span><span>))
+</span><span>        .add_plugins(DefaultPlugins.set(WindowPlugin {
+</span><span>            primary_window: Some(Window {
+</span><span>                canvas: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">#shader_playground</span><span style="color:#556633;">&quot;</span><span>.to_owned()),
+</span><span>                title: </span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Shader Playground</span><span style="color:#556633;">&quot;</span><span>.to_string(),
+</span><span>                present_mode: bevy::window::PresentMode::AutoNoVsync, </span><span style="color:#888888;">// unthrottled FPS
+</span><span>                ..default()
+</span><span>            }),
+</span><span>            ..default()
+</span><span>        }))
+</span><span>        .add_plugin(ShaderPlaygroundPlugin)
+</span><span>        .add_system(set_window_icon.on_startup())
+</span><span>        .run();
+</span><span>}
+</span><span>
+</span><span style="color:#888888;">// &lt;window_icon sys&gt;
+</span><span>...
+</span><span>
+</span></code></pre>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#888888;">// lib.rs
+</span><span>
+</span><span style="color:#888888;">// &lt;imports&gt;
+</span><span>...
+</span><span>
+</span><span style="color:#8fbfdc;">const </span><span style="color:#7697d6;">SIM_SIZE</span><span>: (</span><span style="color:#8fbfdc;">u32</span><span>, </span><span style="color:#8fbfdc;">u32</span><span>) = (</span><span style="color:#cf6a4c;">1280</span><span>, </span><span style="color:#cf6a4c;">720</span><span>);
+</span><span style="color:#8fbfdc;">const </span><span style="color:#7697d6;">WORKGROUP_SIZE</span><span>: </span><span style="color:#8fbfdc;">u32 </span><span>= </span><span style="color:#cf6a4c;">8</span><span>;
+</span><span>
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">ShaderPlaygroundPlugin</span><span>;
+</span><span style="color:#8fbfdc;">impl </span><span>Plugin for </span><span style="color:#ffb964;">ShaderPlaygroundPlugin </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>        app.add_plugin(FrameTimeDiagnosticsPlugin::default())
+</span><span>            .add_system(window_fps);
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">window_fps</span><span>(</span><span style="color:#ffb964;">diagnostics</span><span>: Res&lt;Diagnostics&gt;, </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">windows</span><span>: Query&lt;&amp;</span><span style="color:#8fbfdc;">mut</span><span> Window, With&lt;PrimaryWindow&gt;&gt;) {
+</span><span>    </span><span style="color:#8fbfdc;">if let </span><span>Ok(</span><span style="color:#8fbfdc;">mut</span><span> window) = windows.get_single_mut() {
+</span><span>        </span><span style="color:#8fbfdc;">if let </span><span>Some(fps_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::</span><span style="color:#7697d6;">FPS</span><span>) {
+</span><span>            </span><span style="color:#8fbfdc;">if let </span><span>Some(fps_smoothed) = fps_diagnostic.smoothed() {
+</span><span>                window.title = format!(</span><span style="color:#556633;">&quot;</span><span style="color:#7697d6;">{fps_smoothed:.2}</span><span style="color:#556633;">&quot;</span><span>);
+</span><span>            }
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span><span>
+</span></code></pre>
+<p>Pretty simple setup. Just added a simple fps system to print the FPS at the top of the window. We need to setup our canvas for our simulation.
+We will just use a simple image constrained to our <code>SIM_SIZE</code> variable. You can organize your code how you feel, but I will be breaking out the code
+from the original example into seperate files for readability.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#888888;">// image.rs
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource, Clone, Deref, ExtractResource)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">GameOfLifeImage</span><span>(pub Handle&lt;Image&gt;);
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">create_image</span><span>(</span><span style="color:#ffb964;">width</span><span>: </span><span style="color:#8fbfdc;">u32</span><span>, </span><span style="color:#ffb964;">height</span><span>: </span><span style="color:#8fbfdc;">u32</span><span>) -&gt; Image {
+</span><span>    </span><span style="color:#8fbfdc;">let mut</span><span> image = Image::new_fill(
+</span><span>        Extent3d {
+</span><span>            width,
+</span><span>            height,
+</span><span>            depth_or_array_layers: </span><span style="color:#cf6a4c;">1</span><span>,
+</span><span>        },
+</span><span>        TextureDimension::</span><span style="color:#7697d6;">D2</span><span>,
+</span><span>        &amp;[</span><span style="color:#cf6a4c;">0</span><span>, </span><span style="color:#cf6a4c;">0</span><span>, </span><span style="color:#cf6a4c;">0</span><span>, </span><span style="color:#cf6a4c;">255</span><span>],
+</span><span>        TextureFormat::Rgba8Unorm,
+</span><span>    );
+</span><span>
+</span><span>    image.texture_descriptor.usage =
+</span><span>        TextureUsages::</span><span style="color:#7697d6;">COPY_DST </span><span>| TextureUsages::</span><span style="color:#7697d6;">STORAGE_BINDING </span><span>| TextureUsages::</span><span style="color:#7697d6;">TEXTURE_BINDING</span><span>;
+</span><span>
+</span><span>    image
+</span><span>}
+</span><span>
+</span></code></pre>
+<p>This is just a simple helper function to create an image. We will be using this to create our simulation image. <code>GameOfLifeImage</code> will hold a reference to our
+handle image so that it doesn't get unloaded. You will see it is annotated with <code>ExtractResource</code> derive. This is required to extract the image from the main bevy
+world into the render world. You can also manually derive this, if needed. Lets use it within our setup function. Back in
+<code>lib.rs</code>:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">setup</span><span>(</span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">commands</span><span>: Commands, </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">images</span><span>: ResMut&lt;Assets&lt;Image&gt;&gt;) {
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> image = image::create_image(</span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">0</span><span>, </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">1</span><span>);
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> image = images.add(image);
+</span><span>
+</span><span>    commands.spawn(SpriteBundle {
+</span><span>        sprite: Sprite {
+</span><span>            custom_size: Some(Vec2::new(</span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">0 </span><span>as </span><span style="color:#8fbfdc;">f32</span><span>, </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">1 </span><span>as </span><span style="color:#8fbfdc;">f32</span><span>)),
+</span><span>            ..default()
+</span><span>        },
+</span><span>        texture: image.clone(),
+</span><span>        ..default()
+</span><span>    });
+</span><span>
+</span><span>    commands.spawn(Camera2dBundle::default());
+</span><span>    commands.insert_resource(image::GameOfLifeImage(image));
+</span><span>}
+</span></code></pre>
+<p>Quick and easy. Just create our image, create a sprite based off the image, spawn a 2D camera, and then inject our resource into bevy world.
+Now we just need to hookup our system back in the plugin.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">build</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">app</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> App) {
+</span><span>    app.add_plugin(FrameTimeDiagnosticsPlugin::default())
+</span><span>        .add_startup_system(setup)
+</span><span>        .add_system(window_fps);
+</span><span>}
+</span></code></pre>
+<p>Running the simulation should produce a black screen and nothing more. But hey! No errors! Lets move on.</p>
+<p>As mentioned earlier, bevy has a render world which is extracted each render instance. We need to tell our render setup how to access members from the main world.
+In our plugin, add the <code>ExtractResourcePlugin</code> for our <code>GameOfLifeImage</code> resource.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#888888;">// Extract the game of life image resource from the main world into the render world
+</span><span style="color:#888888;">// for operation on by the compute shader and display on the sprite.
+</span><span>app.add_plugin(ExtractResourcePlugin::&lt;GameOfLifeImage&gt;::default());
+</span><span>...
+</span></code></pre>
+<p>Now onto the actual meat of why I am writing this. Lets get into wgpu. We will be using a compute shader, so our pipeline will need to be a <code>ComputePipeline</code>.</p>
+<blockquote>
+<p>A pipeline describes all the actions the gpu will perform when acting on a set of data</p>
+</blockquote>
+<p>Lets create a new file, <code>pipeline.rs</code> and add the following:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>use bevy::{prelude::*, render::render_resource::*};
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource)]
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">GameOfLifePipeline </span><span>{
+</span><span>    </span><span style="color:#ffb964;">init_pipeline</span><span>: CachedComputePipelineId,
+</span><span>    </span><span style="color:#ffb964;">update_pipeline</span><span>: CachedComputePipelineId,
+</span><span>    </span><span style="color:#ffb964;">texture_bind_group_layout</span><span>: BindGroupLayout,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span>FromWorld for </span><span style="color:#ffb964;">GameOfLifePipeline </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">from_world</span><span>(</span><span style="color:#ffb964;">world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{}
+</span><span>}
+</span><span>
+</span></code></pre>
+<p>Our pipeline resource holds the two compute pipeline id's we will be using (init for setup) and (update for each frame). We also need to hold onto
+the bind group layout.</p>
+<blockquote>
+<p>a bind group layout is a way to describe the structure of resources that a shader will access during execution. The resources include buffers, textures, and samplers</p>
+</blockquote>
+<p>Lets expand upon our <code>FromWorld</code> implementation.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">impl </span><span>FromWorld for </span><span style="color:#ffb964;">GameOfLifePipeline </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">from_world</span><span>(</span><span style="color:#ffb964;">world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> texture_bind_group_layout =
+</span><span>            world
+</span><span>                .resource::&lt;RenderDevice&gt;()
+</span><span>                .create_bind_group_layout(&amp;BindGroupLayoutDescriptor {
+</span><span>                    label: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Bind Group Layout</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>                    entries: &amp;[BindGroupLayoutEntry {
+</span><span>                        binding: </span><span style="color:#cf6a4c;">0</span><span>,
+</span><span>                        visibility: ShaderStages::</span><span style="color:#7697d6;">COMPUTE</span><span>,
+</span><span>                        ty: BindingType::StorageTexture {
+</span><span>                            access: StorageTextureAccess::ReadWrite,
+</span><span>                            format: TextureFormat::Rgba8Unorm,
+</span><span>                            view_dimension: TextureViewDimension::</span><span style="color:#7697d6;">D2</span><span>,
+</span><span>                        },
+</span><span>                        count: None,
+</span><span>                    }],
+</span><span>                });
+</span><span>
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> shader = world
+</span><span>            .resource::&lt;AssetServer&gt;()
+</span><span>            .load(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">shaders/game_of_life.wgsl</span><span style="color:#556633;">&quot;</span><span>);
+</span><span>
+</span><span>        ...
+</span></code></pre>
+<p>WHOA! What is this weird layout stuff? First thing first, the <code>RenderDevice</code> is equivalent to <code>wgpu::Device</code>. We are just using the bevy wrapper.
+I like to add labels to all my shader creations, just to make it easier to track bugs when they do arise. This layout is telling the pipeline that at
+binding(0) we expect there to be a binding of type <code>StorageTexture</code>, that is read_write, and has the format of <code>Rgba8Unorm</code>.</p>
+<p>We then pull the pipeline cache to create our pipelines and pull our shader from the asset's folder.</p>
+<h2 id="compute-shaders">Compute Shaders</h2>
+<blockquote>
+<p>A compute shader is simply a shader that allows you to leverage the GPU's parallel computing power for arbitrary tasks. You can use them for anything from creating a texture to running a neural network. I'll get more into how they work in a bit, but for now suffice to say that we're going to use them to create the vertex and index buffers for our terrain.
+As of writing, compute shaders are still experimental on the web. You can enable them on beta versions of browsers such as Chrome Canary and Firefox Nightly. Because of this I'll cover a method to use a fragment shader to compute the vertex and index buffers after we cover the compute shader method.</p>
+</blockquote>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>    </span><span style="color:#8fbfdc;">let</span><span> init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+</span><span>        layout: vec![texture_bind_group_layout.clone()],
+</span><span>        shader_defs: vec![],
+</span><span>        shader: shader.clone(),
+</span><span>        entry_point: Cow::from(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">init</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>        push_constant_ranges: Vec::new(),
+</span><span>        label: Some(std::borrow::Cow::Borrowed(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Init Pipeline</span><span style="color:#556633;">&quot;</span><span>)),
+</span><span>    });
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> update_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+</span><span>        shader,
+</span><span>        shader_defs: vec![],
+</span><span>        entry_point: Cow::from(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">update</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>        push_constant_ranges: Vec::new(),
+</span><span>        layout: vec![texture_bind_group_layout.clone()],
+</span><span>        label: Some(std::borrow::Cow::Borrowed(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Update Pipeline</span><span style="color:#556633;">&quot;</span><span>)),
+</span><span>    });
+</span><span>
+</span><span>    GameOfLifePipeline {
+</span><span>        texture_bind_group_layout,
+</span><span>        init_pipeline,
+</span><span>        update_pipeline,
+</span><span>    }
+</span></code></pre>
+<p>The init and update pipeline use the same layout and shader. We are not using push constants yet, so we can leave that as an empty vector, same with shader_defs.
+The important part is the entry_point. This is the name of the function in the shader that will be executed.</p>
+<p>Lets quickly setup our shader and then we can move onto the actual compute shader.</p>
+<pre data-lang="wgsl" style="background-color:#151515;color:#e8e8d3;" class="language-wgsl "><code class="language-wgsl" data-lang="wgsl"><span>// assets/game_of_life.wgsl
+</span><span>
+</span><span>@group(0) @binding(0)
+</span><span>var texture: texture_storage_2d&lt;rgba8unorm, read_write&gt;;
+</span><span>
+</span><span>@compute @workgroup_size(8, 8, 1)
+</span><span>fn init(@builtin(global_invocation_id) invocation_id: vec3&lt;u32&gt;, @builtin(num_workgroups) num_workgroups: vec3&lt;u32&gt;) {}
+</span><span>
+</span><span>@compute @workgroup_size(8, 8, 1)
+</span><span>fn update(@builtin(global_invocation_id) invocation_id: vec3&lt;u32&gt;) {}
+</span></code></pre>
+<p>We can see that from what we defined in our <code>BindGroupLayoutDescriptor</code> that we define a <code>texture_storage_2d&lt;rgba8unorm, read_write&gt;</code> at <code>binding(0)</code>. Looking
+back at our descriptor:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>BindGroupLayoutDescriptor {
+</span><span>    label: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Bind Group Layout</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>    entries: &amp;[BindGroupLayoutEntry {
+</span><span>        binding: </span><span style="color:#cf6a4c;">0</span><span>,
+</span><span>        visibility: ShaderStages::</span><span style="color:#7697d6;">COMPUTE</span><span>,
+</span><span>        ty: BindingType::StorageTexture {
+</span><span>            access: StorageTextureAccess::ReadWrite,
+</span><span>            format: TextureFormat::Rgba8Unorm,
+</span><span>            view_dimension: TextureViewDimension::</span><span style="color:#7697d6;">D2</span><span>,
+</span><span>        },
+</span><span>        count: None,
+</span><span>    }],
+</span><span>}
+</span></code></pre>
+<p>We see that our <code>BindGroupLayoutEntry</code> matches what we expect at <code>group(0) binding(0)</code>. This has to match 1:1, otherwise wgpu will panic on run.</p>
+<p>Afterwards, we simply just adds our entry points that we defined in the pipeline's. The <code>@workgroup_size</code> is the size of the workgroup that will be
+executed on the gpu. Bevy example uses 8.
+Let's add our newly created pipeline resource to the render world. Back in the plugin:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">let</span><span> render_app = app.sub_app_mut(RenderApp);
+</span><span>render_app.init_resource::&lt;GameOfLifePipeline&gt;();
+</span></code></pre>
+<p>Running the example now should produce the same screen, but still no errors. We are getting closer to actually doing something. More in part 2.</p>
+<p>Code can be found on github: <a href="https://github.com/n16hth4wkk/bevy_shader_playground/blob/5b841c3ac3f2c08e24ed8b2d47e9996eee0bfda1/sims/game_of_life_sim/src/main.rs">Part 1</a></p>
+
+        </div>
+
+        
+        <div class="pagination">
+            <div class="pagination__title">
+                <span class="pagination__title-h">Thanks for reading! Read other posts?</span>
+                <hr />
+            </div>
+            <div class="pagination__buttons">
+                    <span class="button previous">
+                        <a href="https://n16hth4wkk.github.io/first-post/">
+                            <span class="button__icon">←</span>&nbsp;
+                            <span class="button__text">First Blog Post</span>
+                        </a>
+                    </span>
+                
+                
+                    <span class="button next">
+                        <a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-2/">
+                            <span class="button__text">Exploring Bevy Game of life shader (Part 2)</span>&nbsp;
+                            <span class="button__icon">→</span>
+                        </a>
+                    </span>
+                </div>
+        </div>
+    
+    </div>
+
+    </div>
+
+    
+    <footer class="footer">
+        <div class="footer__inner">
+                <div class="copyright copyright--user">© Jacob LeCoq and n16hth4wkk.github.io, 2023. <br><br> Unauthorized use and/or duplication of this material without express and written permission 
+from this site’s author and/or owner is strictly prohibited. Excerpts and links may be used, provided that full and clear credit is given to Jacob LeCoq 
+and n16hth4wkk.github.io with appropriate and specific direction to the original content </div>
+            </div>
+    </footer>
+    
+
+</div>
+</body>
+
+</html>

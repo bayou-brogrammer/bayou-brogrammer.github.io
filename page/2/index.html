@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title></title>
+    
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <meta name="robots" content="noodp"/>
+
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/style.css">
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/red.css">
+
+        <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/background_blue.css">
+    
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/font-hack-subset.css">
+
+    </head>
+
+<body class="">
+<div class="container">
+    
+    <header class="header">
+        <div class="header__inner">
+            <div class="header__logo">
+                    
+                <a href="https://n16hth4wkk.github.io" style="text-decoration: none;">
+                    <div class="logo">
+                      
+                            Yendor&#x27;s World
+                        
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        
+        
+                <nav class="menu">
+            <ul class="menu__inner">
+                <li class="active"><a href="https://n16hth4wkk.github.io">blog</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/tags">tags</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/archive">archive</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/about">about me</a></li>
+            
+                <li><a href="https://github.com/n16hth4wkk" target="_blank" rel="noopener noreferrer">github</a></li>
+            </ul>
+        </nav>
+    
+    
+        
+    </header>
+    
+
+    <div class="content">
+        
+        <div class="posts">
+                <div class="post on-list">
+                    
+    <h1 class="post-title"><a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-3/">Exploring Bevy Game of life shader (Part 3)</a></h1>
+    <div class="post-meta-inline">
+        
+    <span class="post-date">
+            2023-05-01
+        </span>
+
+    </div>
+
+    
+        <span class="post-tags-inline">
+                :: tags:&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/bevy/">#bevy</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/blog/">#blog</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/programming/">#programming</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/rust/">#rust</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/shader/">#shader</a></span>
+    
+
+                    
+        <div class="post-content">
+            <p>It is exciting to finally see some progress after so much boilerplate! Let's change up the color scheme a bit! I like the color red, so let's make the
+alive cells red. In our shader, switch the init_pipeline color to the following:</p>
+
+        </div>
+        <div>
+            <!-- &#xFE0E; -- force text style - some devices render this as emoji -->
+            <a class="read-more button" href="https://n16hth4wkk.github.io/bevy-gol-explore-part-3/">
+                <span class="button__text">Read more</span>&nbsp;
+                <span class="button__icon">&#8617;&#xFE0E;</span>
+            </a>
+        </div>
+    
+
+                </div>
+            
+                <div class="post on-list">
+                    
+    <h1 class="post-title"><a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-2/">Exploring Bevy Game of life shader (Part 2)</a></h1>
+    <div class="post-meta-inline">
+        
+    <span class="post-date">
+            2023-05-01
+        </span>
+
+    </div>
+
+    
+        <span class="post-tags-inline">
+                :: tags:&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/bevy/">#bevy</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/blog/">#blog</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/programming/">#programming</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/rust/">#rust</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/shader/">#shader</a></span>
+    
+
+                    
+        <div class="post-content">
+            <p>Now that we have our pipeline descriptors setup, its time to build the bind group.</p>
+<blockquote>
+<p>A <code>BindGroup</code> is a collection of resources such as buffers, textures, and samplers that are bound together and made available
+to shaders during rendering. Bind groups are created by the application and then bound to a specific pipeline layout,
+which defines the expected bindings for the resources in the group.</p>
+</blockquote>
+<p>At the bottom of our <code>pipeline.rs</code> file, lets add the system which will create our bindgroup each render instance.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource)]
+</span><span style="color:#8fbfdc;">struct </span><span style="color:#ffb964;">GameOfLifeImageBindGroup</span><span>(pub BindGroup);
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">queue_bind_group</span><span>(
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">commands</span><span>: Commands,
+</span><span>    </span><span style="color:#ffb964;">render_device</span><span>: Res&lt;RenderDevice&gt;,
+</span><span>    </span><span style="color:#ffb964;">pipeline</span><span>: Res&lt;GameOfLifePipeline&gt;,
+</span><span>    </span><span style="color:#ffb964;">gpu_images</span><span>: Res&lt;RenderAssets&lt;Image&gt;&gt;,
+</span><span>    </span><span style="color:#ffb964;">game_of_life_image</span><span>: Res&lt;GameOfLifeImage&gt;,
+</span><span>) {
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> view = &amp;gpu_images[&amp;game_of_life_image.</span><span style="color:#cf6a4c;">0</span><span>];
+</span><span>}
+</span></code></pre>
+
+        </div>
+        <div>
+            <!-- &#xFE0E; -- force text style - some devices render this as emoji -->
+            <a class="read-more button" href="https://n16hth4wkk.github.io/bevy-gol-explore-part-2/">
+                <span class="button__text">Read more</span>&nbsp;
+                <span class="button__icon">&#8617;&#xFE0E;</span>
+            </a>
+        </div>
+    
+
+                </div>
+            <div class="pagination">
+                <div class="pagination__buttons">
+                    <span class="button previous">
+                        <a href="https://n16hth4wkk.github.io/">
+                            <span class="button__icon">←</span>&nbsp;
+                            <span class="button__text">Newer posts</span>
+                        </a>
+                    </span>
+                
+                    <span class="button next">
+                        <a href="https://n16hth4wkk.github.io/page/3/">
+                            <span class="button__text">Older posts</span>&nbsp;
+                            <span class="button__icon">→</span>
+                        </a>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    
+    <footer class="footer">
+        <div class="footer__inner">
+                <div class="copyright copyright--user">© Jacob LeCoq and n16hth4wkk.github.io, 2023. <br><br> Unauthorized use and/or duplication of this material without express and written permission 
+from this site’s author and/or owner is strictly prohibited. Excerpts and links may be used, provided that full and clear credit is given to Jacob LeCoq 
+and n16hth4wkk.github.io with appropriate and specific direction to the original content </div>
+            </div>
+    </footer>
+    
+
+</div>
+</body>
+
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+Allow: /
+Sitemap: https://n16hth4wkk.github.io/sitemap.xml

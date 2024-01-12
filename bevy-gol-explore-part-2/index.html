@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Exploring Bevy Game of life shader (Part 2) | </title>
+    
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <meta name="robots" content="noodp"/>
+
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/style.css">
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/red.css">
+
+        <link rel="stylesheet" href="https://n16hth4wkk.github.io/color/background_blue.css">
+    
+    <link rel="stylesheet" href="https://n16hth4wkk.github.io/font-hack-subset.css">
+
+    </head>
+
+<body class="">
+<div class="container">
+    
+    <header class="header">
+        <div class="header__inner">
+            <div class="header__logo">
+                    
+                <a href="https://n16hth4wkk.github.io" style="text-decoration: none;">
+                    <div class="logo">
+                      
+                            Yendor&#x27;s World
+                        
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        
+        
+                <nav class="menu">
+            <ul class="menu__inner">
+                <li class="active"><a href="https://n16hth4wkk.github.io">blog</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/tags">tags</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/archive">archive</a></li>
+            
+                <li><a href="https://n16hth4wkk.github.io/about">about me</a></li>
+            
+                <li><a href="https://github.com/n16hth4wkk" target="_blank" rel="noopener noreferrer">github</a></li>
+            </ul>
+        </nav>
+    
+    
+        
+    </header>
+    
+
+    <div class="content">
+        
+    <div class="post">
+        
+    <h1 class="post-title"><a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-2/">Exploring Bevy Game of life shader (Part 2)</a></h1>
+    <div class="post-meta-inline">
+        
+    <span class="post-date">
+            2023-05-01
+        </span>
+
+    </div>
+
+    
+        <span class="post-tags-inline">
+                :: tags:&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/bevy/">#bevy</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/blog/">#blog</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/programming/">#programming</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/rust/">#rust</a>&nbsp;
+                <a class="post-tag" href="https://n16hth4wkk.github.io/tags/shader/">#shader</a></span>
+    
+
+        
+        <div class="post-content">
+            <p>Now that we have our pipeline descriptors setup, its time to build the bind group.</p>
+<blockquote>
+<p>A <code>BindGroup</code> is a collection of resources such as buffers, textures, and samplers that are bound together and made available
+to shaders during rendering. Bind groups are created by the application and then bound to a specific pipeline layout,
+which defines the expected bindings for the resources in the group.</p>
+</blockquote>
+<p>At the bottom of our <code>pipeline.rs</code> file, lets add the system which will create our bindgroup each render instance.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span>
+</span><span>#[</span><span style="color:#ffb964;">derive</span><span>(Resource)]
+</span><span style="color:#8fbfdc;">struct </span><span style="color:#ffb964;">GameOfLifeImageBindGroup</span><span>(pub BindGroup);
+</span><span>
+</span><span style="color:#8fbfdc;">pub fn </span><span style="color:#fad07a;">queue_bind_group</span><span>(
+</span><span>    </span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">commands</span><span>: Commands,
+</span><span>    </span><span style="color:#ffb964;">render_device</span><span>: Res&lt;RenderDevice&gt;,
+</span><span>    </span><span style="color:#ffb964;">pipeline</span><span>: Res&lt;GameOfLifePipeline&gt;,
+</span><span>    </span><span style="color:#ffb964;">gpu_images</span><span>: Res&lt;RenderAssets&lt;Image&gt;&gt;,
+</span><span>    </span><span style="color:#ffb964;">game_of_life_image</span><span>: Res&lt;GameOfLifeImage&gt;,
+</span><span>) {
+</span><span>    </span><span style="color:#8fbfdc;">let</span><span> view = &amp;gpu_images[&amp;game_of_life_image.</span><span style="color:#cf6a4c;">0</span><span>];
+</span><span>}
+</span></code></pre>
+<span id="continue-reading"></span>
+<p>Starting off we pull in <code>RenderDevice</code> which is used to create all wgpu resources. <code>RenderAssets&lt;Image&gt;</code> is a resource holding all the GPU representations
+of <code>RenderAssets</code> as long as they exist. We use the handle from the image we created as our canvas, to get the <code>GpuImage</code>. Now the bind group:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">let</span><span> bind_group = render_device.create_bind_group(&amp;BindGroupDescriptor {
+</span><span>    label: Some(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">Game of Life Bind Group</span><span style="color:#556633;">&quot;</span><span>),
+</span><span>    layout: &amp;pipeline.texture_bind_group_layout,
+</span><span>    entries: &amp;[BindGroupEntry {
+</span><span>        binding: </span><span style="color:#cf6a4c;">0</span><span>,
+</span><span>        resource: BindingResource::TextureView(&amp;view.texture_view),
+</span><span>    }],
+</span><span>});
+</span><span>commands.insert_resource(GameOfLifeImageBindGroup(bind_group));
+</span></code></pre>
+<p>Well this looks really familar! It is an exact replica of the bind_group_layout we created earlier. The only difference is that we are now adding
+the actual resources that the layout expects. In this case we are adding the texture view of our canvas image. Lets add the system to our render app.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">let</span><span> render_app = app.sub_app_mut(RenderApp);
+</span><span>        render_app
+</span><span>            .init_resource::&lt;GameOfLifePipeline&gt;()
+</span><span>            .add_system(pipeline::queue_bind_group.in_set(RenderSet::Queue));
+</span></code></pre>
+<p>We add our system to the set <code>RenderSet::Queue</code> which create <code>BindGroups</code> that depend on <code>Prepare</code> data and queue up draw calls to run during the <code>Render</code> step.
+If you try running the app, it will currently crash with the following error:</p>
+<p><code>Resource requested by game_of_life_sim::pipeline::queue_bind_group does not exist: game_of_life_sim::image::GameOfLifeImage</code></p>
+<p>Oops! We forgot to tell bevy render world how to access our Image which exist on the main world. Let's add the <code>ExtractResourcePlugin</code> which just
+extracts the resources into the &quot;render world&quot;.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>app.add_plugin(FrameTimeDiagnosticsPlugin::default())
+</span><span>    </span><span style="color:#888888;">// Extract the game of life image resource from the main world into the render world
+</span><span>    </span><span style="color:#888888;">// for operation on by the compute shader and display on the sprite.
+</span><span>    .add_plugin(ExtractResourcePlugin::&lt;GameOfLifeImage&gt;::default())
+</span><span>    ...
+</span></code></pre>
+<p>If you run again, no errors! Awesome :D. Now onto nodes and the render graph. This was new to me after I setup wgpu manually in my other projects. If you are curious,
+this is the docstring attached to the <code>RenderGraph</code> resource:</p>
+<blockquote>
+<p>The <code>RenderGraph</code> configures the modular, parallel and re-usable render logic. It is a retained and stateless (nodes themselves may have their own
+internal state) structure, which can not be modified while it is executed by the graph runner.
+The <code>RenderGraphRunner</code> is responsible for executing the entire graph each frame. It consists of three main components: Nodes, Edges and Slots.
+<code>Nodes</code> are responsible for generating draw calls and operating on input and output slots. <code>Edges</code> specify the order of execution for nodes and connect input and output slots together.
+<code>Slots</code> describe the render resources created or used by the nodes.
+Additionally a render graph can contain multiple sub graphs, which are run by the corresponding nodes. Every render graph can have its own optional input node.</p>
+</blockquote>
+<p>Essentially we setup a graph to tell the render world how to run our pipelines. We only have a single pipeline currnetly, so we will only need a single node.</p>
+<p>Our node will have a state for processing which stage the shader is currently in: <code>Loading</code>, <code>Init</code>, <code>Update</code>. Back in <code>pipeline.rs</code> lets add our node:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">pub enum </span><span style="color:#ffb964;">GameOfLifeState </span><span>{
+</span><span>    Loading,
+</span><span>    Init,
+</span><span>    Update,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">pub struct </span><span style="color:#ffb964;">GameOfLifeNode </span><span>{
+</span><span>    </span><span style="color:#ffb964;">state</span><span>: GameOfLifeState,
+</span><span>}
+</span><span>
+</span><span style="color:#8fbfdc;">impl </span><span>Default for </span><span style="color:#ffb964;">GameOfLifeNode </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">default</span><span>() -&gt; </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>        </span><span style="color:#8fbfdc;">Self </span><span>{
+</span><span>            state: GameOfLifeState::Loading,
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Lets add the node to our render app:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">let</span><span> render_app = app.sub_app_mut(RenderApp);
+</span><span>render_app
+</span><span>    .init_resource::&lt;GameOfLifePipeline&gt;()
+</span><span>    .add_system(pipeline::queue_bind_group.in_set(RenderSet::Queue));
+</span><span>
+</span><span style="color:#8fbfdc;">let mut</span><span> render_graph = render_app.world.resource_mut::&lt;RenderGraph&gt;();
+</span><span>render_graph.add_node(</span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life</span><span style="color:#556633;">&quot;</span><span>, GameOfLifeNode::default());
+</span><span>render_graph.add_node_edge(
+</span><span>    </span><span style="color:#556633;">&quot;</span><span style="color:#99ad6a;">game_of_life</span><span style="color:#556633;">&quot;</span><span>,
+</span><span>    bevy::render::main_graph::node::</span><span style="color:#7697d6;">CAMERA_DRIVER</span><span>,
+</span><span>);
+</span></code></pre>
+<p>We add the node to the render graph and then add an edge to the camera driver. This will tell the render graph to run our node before the camera driver.</p>
+<p>Our node starts in the Loading state. We now have to impl bevy's <code>render_graph::Node</code>: The trait is defined as follow:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">pub trait </span><span style="color:#ffb964;">Node</span><span>: Downcast + Send + Sync + &#39;static {
+</span><span>    </span><span style="color:#888888;">/// Specifies the required input slots for this node.
+</span><span>    </span><span style="color:#888888;">/// They will then be available during the run method inside the [`RenderGraphContext`].
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">input</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>) -&gt; Vec&lt;SlotInfo&gt; {
+</span><span>        Vec::new()
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#888888;">/// Specifies the produced output slots for this node.
+</span><span>    </span><span style="color:#888888;">/// They can then be passed one inside [`RenderGraphContext`] during the run method.
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">output</span><span>(&amp;</span><span style="color:#ffb964;">self</span><span>) -&gt; Vec&lt;SlotInfo&gt; {
+</span><span>        Vec::new()
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#888888;">/// Updates internal node state using the current render [`World`] prior to the run method.
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">update</span><span>(&amp;</span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">_world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) {}
+</span><span>
+</span><span>    </span><span style="color:#888888;">/// Runs the graph node logic, issues draw calls, updates the output slots and
+</span><span>    </span><span style="color:#888888;">/// optionally queues up subgraphs for execution. The graph data, input and output values are
+</span><span>    </span><span style="color:#888888;">/// passed via the [`RenderGraphContext`].
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">run</span><span>(
+</span><span>        &amp;</span><span style="color:#ffb964;">self</span><span>,
+</span><span>        </span><span style="color:#ffb964;">graph</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> RenderGraphContext,
+</span><span>        </span><span style="color:#ffb964;">render_context</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> RenderContext,
+</span><span>        </span><span style="color:#ffb964;">world</span><span>: &amp;World,
+</span><span>    ) -&gt; Result&lt;(), NodeRunError&gt;;
+</span><span>}
+</span></code></pre>
+<p>The <code>input</code> defines required input slots and <code>output</code> defines produced output slots. This will exist on the <code>RenderGraphContext</code>. Our example doesn't
+use either, so we don't care for the graph context.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">impl </span><span>render_graph::Node for </span><span style="color:#ffb964;">GameOfLifeNode </span><span>{
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">update</span><span>(&amp;</span><span style="color:#8fbfdc;">mut </span><span style="color:#ffb964;">self</span><span>, </span><span style="color:#ffb964;">world</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> World) {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline = world.resource::&lt;GameOfLifePipeline&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>
+</span><span>        </span><span style="color:#888888;">// if the corresponding pipeline has loaded, transition to the next stage
+</span><span>        </span><span style="color:#8fbfdc;">match </span><span style="color:#ffb964;">self</span><span>.state {
+</span><span>            GameOfLifeState::Loading =&gt; {
+</span><span>                </span><span style="color:#8fbfdc;">if let </span><span>CachedPipelineState::Ok(_) =
+</span><span>                    pipeline_cache.get_compute_pipeline_state(pipeline.init_pipeline)
+</span><span>                {
+</span><span>                    </span><span style="color:#ffb964;">self</span><span>.state = GameOfLifeState::Init;
+</span><span>                }
+</span><span>            }
+</span><span>            GameOfLifeState::Init =&gt; {
+</span><span>                </span><span style="color:#8fbfdc;">if let </span><span>CachedPipelineState::Ok(_) =
+</span><span>                    pipeline_cache.get_compute_pipeline_state(pipeline.update_pipeline)
+</span><span>                {
+</span><span>                    </span><span style="color:#ffb964;">self</span><span>.state = GameOfLifeState::Update;
+</span><span>                }
+</span><span>            }
+</span><span>            GameOfLifeState::Update =&gt; {}
+</span><span>        }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">run</span><span>(
+</span><span>        &amp;</span><span style="color:#ffb964;">self</span><span>,
+</span><span>        </span><span style="color:#ffb964;">_graph</span><span>: &amp;</span><span style="color:#8fbfdc;">mut </span><span>render_graph::RenderGraphContext,
+</span><span>        </span><span style="color:#ffb964;">render_context</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> RenderContext,
+</span><span>        </span><span style="color:#ffb964;">world</span><span>: &amp;World,
+</span><span>    ) -&gt; Result&lt;(), render_graph::NodeRunError&gt; {
+</span><span>        Ok(())
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Lets focus on the <code>update</code> method. We are checking if the pipeline has loaded. If it has, we transition to the next stage. For update,
+we have no other state to transition to, but if you needed to recreate your pipeline or rerun your init pipeline, you would do change the state here.</p>
+<p>The fun stuff: <code>run</code>. This is where we will be running our compute shaders. Let's setup the init pipeline first:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">fn </span><span style="color:#fad07a;">run</span><span>(
+</span><span>        &amp;</span><span style="color:#ffb964;">self</span><span>,
+</span><span>        </span><span style="color:#ffb964;">_graph</span><span>: &amp;</span><span style="color:#8fbfdc;">mut </span><span>render_graph::RenderGraphContext,
+</span><span>        </span><span style="color:#ffb964;">render_context</span><span>: &amp;</span><span style="color:#8fbfdc;">mut</span><span> RenderContext,
+</span><span>        </span><span style="color:#ffb964;">world</span><span>: &amp;World,
+</span><span>    ) -&gt; Result&lt;(), render_graph::NodeRunError&gt; {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> texture_bind_group = &amp;world.resource::&lt;GameOfLifeImageBindGroup&gt;().</span><span style="color:#cf6a4c;">0</span><span>;
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline_cache = world.resource::&lt;PipelineCache&gt;();
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> pipeline = world.resource::&lt;GameOfLifePipeline&gt;();
+</span><span>        ...
+</span></code></pre>
+<p>We have to pull 3 resources from the world: <code>GameOfLifeImageBindGroup</code>, <code>PipelineCache</code>, and <code>GameOfLifePipeline</code>. We are already familiar
+with the pipeline and pipeline cache, but the new resource <code>GameOfLifeImageBindGroup</code> is a <code>BindGroup</code> that we queue each frame to be used by the shader.
+Now we beging the <code>ComputePass</code>.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span style="color:#8fbfdc;">let mut</span><span> pass = render_context
+</span><span>    .command_encoder()
+</span><span>    .begin_compute_pass(&amp;ComputePassDescriptor::default());
+</span><span>...
+</span></code></pre>
+<p>Since we are only using compute shaders, we need to begin a compute pass, the other side of the coin is a render pass for vertex and fragment shaders.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span>...
+</span><span>pass.set_bind_group(</span><span style="color:#cf6a4c;">0</span><span>, texture_bind_group, &amp;[]);
+</span><span>...
+</span></code></pre>
+<p>Assign our bindgroup the the compute pass. Then we pull the state defined from our node to see which piplline to execute.</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#888888;">// select the pipeline based on the current state
+</span><span style="color:#8fbfdc;">match </span><span style="color:#ffb964;">self</span><span>.state {
+</span><span>    GameOfLifeState::Update | GameOfLifeState::Loading =&gt; {}
+</span><span>    GameOfLifeState::Init =&gt; {
+</span><span>        </span><span style="color:#8fbfdc;">let</span><span> init_pipeline = pipeline_cache
+</span><span>            .get_compute_pipeline(pipeline.init_pipeline)
+</span><span>            .unwrap();
+</span><span>        pass.set_pipeline(init_pipeline);
+</span><span>        pass.dispatch_workgroups(
+</span><span>            </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">0 </span><span>/ </span><span style="color:#7697d6;">WORKGROUP_SIZE</span><span>,
+</span><span>            </span><span style="color:#7697d6;">SIM_SIZE</span><span>.</span><span style="color:#cf6a4c;">1 </span><span>/ </span><span style="color:#7697d6;">WORKGROUP_SIZE</span><span>,
+</span><span>            </span><span style="color:#cf6a4c;">1</span><span>,
+</span><span>        );
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>We are skipping the update pipeline currently, but we will come back to it. For the init state, we want to run the init pipeline. We set the pipeline using our
+<code>CachedComputePipelineId</code> defined in our <code>GameOfLifePipeline</code>. Then we dispatch the workgroups. The function takes 3 arguments: <code>x</code>, <code>y</code>, <code>z</code>. In our shader,
+we defined our workgroup size as 8x8x1. <code>@compute @workgroup_size(8, 8, 1)</code></p>
+<p>A visual representation of work groups: <a href="https://github.com/sotrh/learn-wgpu/raw/master/docs/intermediate/tutorial13-terrain/figure_work-groups.jpg">Work Groups</a>.</p>
+<p>It may be helpful to think of a compute shader as a function that is run in a bunch of nested for loops, but each loop is executed in parallel. It would look something like this:</p>
+<pre data-lang="rust" style="background-color:#151515;color:#e8e8d3;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#8fbfdc;">for</span><span> wgx in num_workgroups.x:
+</span><span>    </span><span style="color:#8fbfdc;">for</span><span> wgy in num_workgroups.y:
+</span><span>        </span><span style="color:#8fbfdc;">for</span><span> wgz in num_workgroups.z:
+</span><span>            var local_invocation_id = (wgx, wgy, wgz)
+</span><span>            </span><span style="color:#8fbfdc;">for</span><span> x in workgroup_size.x:
+</span><span>                </span><span style="color:#8fbfdc;">for</span><span> y in workgroup_size.x:
+</span><span>                    </span><span style="color:#8fbfdc;">for</span><span> z in workgroup_size.x:
+</span></code></pre>
+<p>Running still produces the same black screen, but I promise the init pipeline triggered once, we just need to add code to our shader now! Bevy uses wgpu internally,
+which uses wgsl as their default shader language. They also support GLSL, but a word of warning, there can be some weird quirks when using GLSL with wgpu.</p>
+<p>To start with our <code>init</code> function in our shader, we see some function inputs:</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">init</span><span>(@</span><span style="color:#ffb964;">builtin</span><span>(global_invocation_id) invocation_id: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;, @</span><span style="color:#ffb964;">builtin</span><span>(num_workgroups) num_workgroups: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;) 
+</span></code></pre>
+<p>This is a builtin value for the current invocation’s global invocation ID, i.e. its position in the compute shader grid. WGSL has many builtin values
+and functions. Please refer to the spec for more info <a href="https://www.w3.org/TR/WGSL/">WebGPU Shading Language</a>.</p>
+<p>And the <code>num_workgroups</code> is the number of workgroups in each dimension.</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">init</span><span>(@</span><span style="color:#ffb964;">builtin</span><span>(global_invocation_id) invocation_id: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;, @</span><span style="color:#ffb964;">builtin</span><span>(num_workgroups) num_workgroups: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;) {
+</span><span>    let location = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;(invocation_id.</span><span style="color:#ffb964;">xy</span><span>);
+</span><span>}
+</span></code></pre>
+<p>We can get the current location within the shader by casting the invocation.xy to an i32.</p>
+<blockquote>
+<p>invocation.xy is short hand for invocation.x and invocation.y</p>
+</blockquote>
+<p>We want to randomize our initial state, so lets define a random function.</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">hash</span><span>(value: </span><span style="color:#ffb964;">u32</span><span>) -&gt; u32 {
+</span><span>    var state = value;
+</span><span>    state = state ^ </span><span style="color:#cf6a4c;">2747636419u</span><span>;
+</span><span>    state = state * </span><span style="color:#cf6a4c;">2654435769u</span><span>;
+</span><span>    state = state ^ state &gt;&gt; </span><span style="color:#cf6a4c;">16u</span><span>;
+</span><span>    state = state * </span><span style="color:#cf6a4c;">2654435769u</span><span>;
+</span><span>    state = state ^ state &gt;&gt; </span><span style="color:#cf6a4c;">16u</span><span>;
+</span><span>    state = state * </span><span style="color:#cf6a4c;">2654435769u</span><span>;
+</span><span>    </span><span style="color:#8fbfdc;">return</span><span> state;
+</span><span>}
+</span><span>
+</span><span>fn </span><span style="color:#fad07a;">randomFloat</span><span>(value: </span><span style="color:#ffb964;">u32</span><span>) -&gt; f32 {
+</span><span>    </span><span style="color:#8fbfdc;">return </span><span style="color:#ffb964;">f32</span><span>(</span><span style="color:#ffb964;">hash</span><span>(value)) / </span><span style="color:#cf6a4c;">4294967295.0</span><span>;
+</span><span>}
+</span></code></pre>
+<p>There are many hash / random functions you can find online. Each with their own pros and cons. I am just using the bevy default.</p>
+<blockquote>
+<p>2654435769u is a inline cast like in rust with 2654435769_u32. The u is for u32.</p>
+</blockquote>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>let randomNumber = </span><span style="color:#ffb964;">randomFloat</span><span>(invocation_id.</span><span style="color:#ffb964;">y </span><span>* num_workgroups.</span><span style="color:#ffb964;">x </span><span>+ invocation_id.</span><span style="color:#ffb964;">x</span><span>);
+</span><span>let alive = randomNumber &gt; </span><span style="color:#cf6a4c;">0.9</span><span>;
+</span></code></pre>
+<p>We generate a random number, and if it is greater than 0.9, we set the cell to alive. We can now set the cell in our texture. Play around with what denotes
+and alive cell. Lowering <code>0.9</code> will generate more alive cells and vice versa. Lets finish off the init.</p>
+<pre data-lang="glsl" style="background-color:#151515;color:#e8e8d3;" class="language-glsl "><code class="language-glsl" data-lang="glsl"><span>fn </span><span style="color:#fad07a;">init</span><span>(@</span><span style="color:#ffb964;">builtin</span><span>(global_invocation_id) invocation_id: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;, @</span><span style="color:#ffb964;">builtin</span><span>(num_workgroups) num_workgroups: </span><span style="color:#8fbfdc;">vec3</span><span>&lt;u32&gt;) {
+</span><span>    let location = </span><span style="color:#8fbfdc;">vec2</span><span>&lt;i32&gt;(invocation_id.</span><span style="color:#ffb964;">xy</span><span>);
+</span><span>
+</span><span>    let randomNumber = </span><span style="color:#ffb964;">randomFloat</span><span>(invocation_id.</span><span style="color:#ffb964;">y </span><span>* num_workgroups.</span><span style="color:#ffb964;">x </span><span>+ invocation_id.</span><span style="color:#ffb964;">x</span><span>);
+</span><span>    let alive = randomNumber &gt; </span><span style="color:#cf6a4c;">0.9</span><span>;
+</span><span>    let color = </span><span style="color:#8fbfdc;">vec4</span><span>&lt;f32&gt;(</span><span style="color:#ffb964;">f32</span><span>(alive));
+</span><span>
+</span><span>    </span><span style="color:#ffb964;">textureStore</span><span>(texture, location, color);
+</span><span>}
+</span></code></pre>
+<p>You might be curious what <code>vec4&lt;f32&gt;(f32(alive))</code> is doing here. <code>vec4&lt;f32&gt;()</code> is casting the value to a <code>vec4&lt;f32&gt;</code>. We are using the <code>f32()</code> function to cast
+the alive value from a <code>bool</code> to a <code>f32</code>. So if alive the color will be <code>vec4&lt;f32&gt;(1.0)</code> or <code>(1.0,1.0,1.0,1.0)</code> and if dead <code>vec4&lt;f32&gt;(0.0)</code> or <code>(0.0,0.0,0.0,0.0)</code>.</p>
+<p>And now the moment of truth, we can run our code and see the results! Running should produce something like this:</p>
+
+  <img src="/images/gol_part2.png" class="center" />
+
+<p>Code can be found on github: <a href="https://github.com/n16hth4wkk/bevy_shader_playground/blob/4f91ce7dd48d83adb6f9823b01c16941e6b3db67/sims/game_of_life_sim/src/lib.rs">Part 2</a></p>
+
+        </div>
+
+        
+        <div class="pagination">
+            <div class="pagination__title">
+                <span class="pagination__title-h">Thanks for reading! Read other posts?</span>
+                <hr />
+            </div>
+            <div class="pagination__buttons">
+                    <span class="button previous">
+                        <a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-1/">
+                            <span class="button__icon">←</span>&nbsp;
+                            <span class="button__text">Exploring Bevy Game of life shader (Part 1)</span>
+                        </a>
+                    </span>
+                
+                
+                    <span class="button next">
+                        <a href="https://n16hth4wkk.github.io/bevy-gol-explore-part-3/">
+                            <span class="button__text">Exploring Bevy Game of life shader (Part 3)</span>&nbsp;
+                            <span class="button__icon">→</span>
+                        </a>
+                    </span>
+                </div>
+        </div>
+    
+    </div>
+
+    </div>
+
+    
+    <footer class="footer">
+        <div class="footer__inner">
+                <div class="copyright copyright--user">© Jacob LeCoq and n16hth4wkk.github.io, 2023. <br><br> Unauthorized use and/or duplication of this material without express and written permission 
+from this site’s author and/or owner is strictly prohibited. Excerpts and links may be used, provided that full and clear credit is given to Jacob LeCoq 
+and n16hth4wkk.github.io with appropriate and specific direction to the original content </div>
+            </div>
+    </footer>
+    
+
+</div>
+</body>
+
+</html>
